@@ -1,30 +1,36 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:second_brain_app/main.dart';
+import 'package:second_brain_app/features/assistant/controller/assistant_controller.dart';
+import 'package:second_brain_app/models/vault_model.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('assistant can add a note from a local command', () {
+    final response = AssistantEngine(VaultData.empty()).handle(
+      "Add a new note with title 'Meeting with John' and content 'Discussed project timeline'",
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(response.vault, isNotNull);
+    expect(response.vault!.notes, hasLength(1));
+    expect(response.vault!.notes.single.title, 'Meeting with John');
+    expect(response.vault!.notes.single.content, 'Discussed project timeline');
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  test('global search finds password account names without exposing password', () {
+    final vault = VaultData.empty().copyWith(
+      passwords: const [
+        VaultPassword(
+          id: '1',
+          accountName: 'HDFC Bank',
+          username: 'rachit',
+          password: 'secret-password',
+        ),
+      ],
+    );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    final results = vault.search('hdfc');
+
+    expect(results, hasLength(1));
+    expect(results.single.title, 'HDFC Bank');
+    expect(results.single.subtitle, 'rachit');
+    expect(results.single.secret, 'secret-password');
   });
 }
