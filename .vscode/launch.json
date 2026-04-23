@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Android (V2135, low memory)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "V2135",
+      "toolArgs": [
+        "--no-pub",
+        "-q"
+      ],
+      "env": {
+        "DART_VM_OPTIONS": "--old_gen_heap_size=1536",
+        "GRADLE_OPTS": "-Xmx2560m -XX:MaxMetaspaceSize=256m"
+      }
+    }
+  ]
+}
