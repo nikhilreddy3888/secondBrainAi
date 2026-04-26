@@ -54,12 +54,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/assistant',
         name: 'assistant',
-        builder: (context, state) => const AssistantScreen(),
+        builder: (context, state) {
+          final initialPrompt =
+              state.extra is String ? state.extra as String : null;
+          return AssistantScreen(initialPrompt: initialPrompt);
+        },
       ),
       GoRoute(
         path: '/search',
         name: 'search',
-        builder: (context, state) => const SearchScreen(),
+        builder: (context, state) {
+          final initialQuery =
+              state.extra is String ? state.extra as String : null;
+          return SearchScreen(initialQuery: initialQuery);
+        },
       ),
       GoRoute(
         path: '/settings',

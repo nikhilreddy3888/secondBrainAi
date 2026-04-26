@@ -86,6 +86,7 @@ class VaultData {
         MapEntry(
           score(haystack),
           SearchResult(
+            id: note.id,
             type: 'Note',
             icon: Icons.sticky_note_2_outlined,
             title: note.title,
@@ -102,6 +103,7 @@ class VaultData {
         MapEntry(
           score(haystack),
           SearchResult(
+            id: password.id,
             type: 'Password',
             icon: Icons.lock_outline,
             title: password.accountName,
@@ -119,6 +121,7 @@ class VaultData {
         MapEntry(
           score(haystack),
           SearchResult(
+            id: doc.id,
             type: 'Document',
             icon: Icons.description_outlined,
             title: doc.title,
@@ -135,6 +138,7 @@ class VaultData {
         MapEntry(
           score(haystack),
           SearchResult(
+            id: event.id,
             type: 'Event',
             icon: Icons.event_outlined,
             title: event.title,
@@ -295,6 +299,7 @@ class VaultEvent {
 
 class SearchResult {
   const SearchResult({
+    required this.id,
     required this.type,
     required this.icon,
     required this.title,
@@ -302,6 +307,7 @@ class SearchResult {
     this.secret,
   });
 
+  final String id;
   final String type;
   final IconData icon;
   final String title;

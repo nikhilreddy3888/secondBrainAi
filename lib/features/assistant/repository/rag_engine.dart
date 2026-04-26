@@ -172,13 +172,15 @@ class VaultRagEngine {
     }
 
     for (final password in vault.passwords) {
+      final redacted = _redactSecret(password.password);
       chunks.add(
         _RawChunk(
           sourceId: password.id,
           sourceType: 'Password',
           title: password.accountName,
+          // Never place raw password values into retrieval context.
           text:
-              'account ${password.accountName}, username ${password.username}, password ${password.password}',
+              'account ${password.accountName}, username ${password.username}, password reference $redacted',
         ),
       );
     }
@@ -257,5 +259,12 @@ class VaultRagEngine {
   double _idf(int totalDocs, int docFreq) {
     if (docFreq <= 0) return 0;
     return ((totalDocs - docFreq + 0.5) / (docFreq + 0.5) + 1.0);
+  }
+
+  String _redactSecret(String secret) {
+    if (secret.isEmpty) return '[empty]';
+    if (secret.length <= 2) return '*' * secret.length;
+    final visibleTail = secret.substring(secret.length - 2);
+    return '${'*' * (secret.length - 2)}$visibleTail';
   }
 }

@@ -23,3 +23,8 @@ Example prompts:
 flutter pub get
 flutter run
 ```
+
+## Architecture
+
+- Local-first encrypted architecture: `docs/local_first_architecture.md`
+- Step-by-step implementation checklist: `docs/implementation_checklist.md`

@@ -10,6 +10,22 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    packaging {
+        jniLibs {
+            pickFirsts += setOf(
+                "lib/*/libc++_shared.so",
+            )
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs(
+                "../../third_party/runanywhere/android/build/jniLibs",
+            )
+        }
+    }
+
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17

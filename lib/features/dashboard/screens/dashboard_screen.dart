@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme.dart';
+import '../../documents/screens/documents_screen.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../vault/controller/vault_controller.dart';
 
@@ -40,6 +41,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: _buildAppBar(context),
       body: CustomScrollView(
         slivers: [
@@ -167,12 +169,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         controller: _searchController,
         style: TextStyle(color: theme.colorScheme.onSurface),
         decoration: InputDecoration(
-          hintText: 'Search notes...',
+          hintText: 'Search notes, passwords, events, documents...',
           hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
           prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
+        textInputAction: TextInputAction.search,
+        onSubmitted: (value) {
+          final query = value.trim();
+          if (query.isNotEmpty) {
+            context.push('/search', extra: query);
+          }
+        },
       ),
     );
   }
@@ -288,16 +297,80 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       loading: () => const SliverFillRemaining(child: Center(child: CircularProgressIndicator())),
       error: (error, stack) => SliverFillRemaining(child: Center(child: Text(error.toString()))),
       data: (vault) {
-        final notes = vault.notes.where((note) {
-          if (_searchQuery.isEmpty) return true;
-          return '${note.title} ${note.content}'.toLowerCase().contains(_searchQuery.toLowerCase());
-        }).toList();
+        if (_searchQuery.trim().isNotEmpty) {
+          final results = vault.search(_searchQuery);
+          if (results.isEmpty) {
+            return SliverFillRemaining(
+              child: Center(
+                child: Text(
+                  'No vault items match your search.',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            );
+          }
+          return SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final result = results[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: theme.colorScheme.outline),
+                      ),
+                      child: ListTile(
+                        leading: Icon(result.icon),
+                        title: Text(result.title),
+                        subtitle: Text(
+                          '${result.type} - ${result.subtitle}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () {
+                          if (result.type == 'Note') {
+                            final note = vault.notes
+                                .where((item) => item.id == result.id)
+                                .firstOrNull;
+                            if (note != null) {
+                              context.push('/notes/add', extra: note);
+                            }
+                          } else if (result.type == 'Document') {
+                            final document = vault.documents
+                                .where((item) => item.id == result.id)
+                                .firstOrNull;
+                            if (document != null) {
+                              DocumentsScreen.openDocument(context, document);
+                            }
+                          } else if (result.type == 'Password') {
+                            context.push('/passwords');
+                          } else if (result.type == 'Event') {
+                            context.push('/events');
+                          }
+                        },
+                        trailing: result.secret == null
+                            ? null
+                            : const Icon(Icons.lock_outline),
+                      ),
+                    ),
+                  );
+                },
+                childCount: results.length,
+              ),
+            ),
+          );
+        }
+        final notes = vault.notes;
         
         if (notes.isEmpty) {
           return SliverFillRemaining(
             child: Center(
               child: Text(
-                _searchQuery.isEmpty ? 'No notes found.' : 'No notes match your search.',
+                'No notes found.',
                 style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
@@ -322,10 +395,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: theme.colorScheme.outlineVariant ?? theme.colorScheme.outline.withOpacity(0.5)),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -419,84 +494,91 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildBottomInput(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 12,
-        bottom: MediaQuery.of(context).padding.bottom + 12,
-      ),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(color: theme.colorScheme.outline),
+    final mediaQuery = MediaQuery.of(context);
+    final bottomInset = mediaQuery.viewInsets.bottom;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 12,
+          bottom: mediaQuery.padding.bottom + 12,
         ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0, right: 8.0),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.actionButtonColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome,
-                        color: Colors.white,
-                        size: 16,
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          border: Border(
+            top: BorderSide(color: theme.colorScheme.outline),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0, right: 8.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.actionButtonColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.white,
+                          size: 16,
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _aiController,
-                      style: TextStyle(color: theme.colorScheme.onSurface),
-                      decoration: InputDecoration(
-                        hintText: 'Ask your second brain...',
-                        hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                        border: InputBorder.none,
+                    Expanded(
+                      child: TextField(
+                        controller: _aiController,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
+                        decoration: InputDecoration(
+                          hintText: 'Ask your second brain...',
+                          hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                          border: InputBorder.none,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          InkWell(
-            onTap: () {
-              if (_aiController.text.isNotEmpty) {
-                context.push('/assistant');
-                _aiController.clear();
-              }
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.actionButtonColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.send,
-                color: Colors.white,
-                size: 20,
+            const SizedBox(width: 12),
+            InkWell(
+              onTap: () {
+                final prompt = _aiController.text.trim();
+                if (prompt.isNotEmpty) {
+                  context.push('/assistant', extra: prompt);
+                  _aiController.clear();
+                }
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.actionButtonColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.send,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
-

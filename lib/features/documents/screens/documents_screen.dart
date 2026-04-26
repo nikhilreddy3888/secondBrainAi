@@ -47,14 +47,20 @@ class DocumentsScreen extends ConsumerWidget {
                     border: Border.all(color: theme.colorScheme.outline),
                   ),
                   child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     leading: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(_iconForExt(doc.fileName), color: theme.colorScheme.onSurfaceVariant),
+                      child: Icon(
+                        _iconForExt(doc.fileName),
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     title: Text(
                       doc.title,
@@ -68,13 +74,26 @@ class DocumentsScreen extends ConsumerWidget {
                       doc.fileName,
                       style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                     ),
-                    onTap: () => _viewDocument(context, doc),
-                    trailing: IconButton(
-                      tooltip: 'Delete document',
-                      onPressed: () {
-                        ref.read(vaultControllerProvider.notifier).deleteDocument(doc.id);
-                      },
-                      icon: const Icon(Icons.delete_outline),
+                    onTap: () => DocumentsScreen.openDocument(context, doc),
+                    trailing: Wrap(
+                      spacing: 4,
+                      children: [
+                        IconButton(
+                          tooltip: 'View document',
+                          onPressed: () =>
+                              DocumentsScreen.openDocument(context, doc),
+                          icon: const Icon(Icons.visibility_outlined),
+                        ),
+                        IconButton(
+                          tooltip: 'Delete document',
+                          onPressed: () {
+                            ref
+                                .read(vaultControllerProvider.notifier)
+                                .deleteDocument(doc.id);
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -153,7 +172,7 @@ class DocumentsScreen extends ConsumerWidget {
     await ref.read(vaultControllerProvider.notifier).addDocument(document);
   }
 
-  void _viewDocument(BuildContext context, VaultDocument doc) {
+  static void openDocument(BuildContext context, VaultDocument doc) {
     final ext = doc.fileName.split('.').last.toLowerCase();
     final isPdf = ext == 'pdf';
     final isImage = ['jpg', 'jpeg', 'png'].contains(ext);
@@ -169,28 +188,7 @@ class DocumentsScreen extends ConsumerWidget {
     if (isPdf) {
       _openPdfViewer(context, doc.title, bytes, doc.path);
     } else if (isImage) {
-      Widget imageWidget;
-      if (bytes != null) {
-        imageWidget = InteractiveViewer(
-          child: Image.memory(bytes, fit: BoxFit.contain),
-        );
-      } else if (doc.path.isNotEmpty && File(doc.path).existsSync()) {
-        imageWidget = InteractiveViewer(
-          child: Image.file(File(doc.path), fit: BoxFit.contain),
-        );
-      } else {
-        imageWidget = const Center(
-          child: Text('Image file is no longer available.\nRe-upload the document to view it.'),
-        );
-      }
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => Scaffold(
-            appBar: AppBar(title: Text(doc.title)),
-            body: SafeArea(child: imageWidget),
-          ),
-        ),
-      );
+      _openImageViewer(context, doc, bytes);
     } else {
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -212,7 +210,90 @@ class DocumentsScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _openPdfViewer(
+  static void _openImageViewer(
+    BuildContext context,
+    VaultDocument doc,
+    Uint8List? bytes,
+  ) {
+    final localFile =
+        doc.path.isNotEmpty && File(doc.path).existsSync() ? File(doc.path) : null;
+
+    Widget image;
+    if (bytes != null && bytes.isNotEmpty) {
+      image = Image.memory(
+        bytes,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => _UnavailableDocument(
+          message:
+              'This image could not be decoded. Re-upload the JPG or save it as PNG.',
+          detail: error.toString(),
+        ),
+      );
+    } else if (localFile != null) {
+      image = Image.file(
+        localFile,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => _UnavailableDocument(
+          message:
+              'This local image file could not be opened. Re-upload the document to store a copy inside the vault.',
+          detail: error.toString(),
+        ),
+      );
+    } else {
+      image = const _UnavailableDocument(
+        message:
+            'Image file is no longer available. Re-upload the document to view it.',
+      );
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Image preview'),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(28),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    doc.fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          body: SafeArea(
+            child: ColoredBox(
+              color: Colors.black,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 5,
+                    child: SizedBox(
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                      child: image,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Future<void> _openPdfViewer(
     BuildContext context,
     String title,
     Uint8List? bytes,
@@ -262,6 +343,54 @@ class DocumentsScreen extends ConsumerWidget {
             fitPolicy: FitPolicy.BOTH,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _UnavailableDocument extends StatelessWidget {
+  const _UnavailableDocument({
+    required this.message,
+    this.detail,
+  });
+
+  final String message;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      color: theme.colorScheme.surface,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.broken_image_outlined,
+            size: 48,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: theme.colorScheme.onSurface),
+          ),
+          if (detail != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              detail!,
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
