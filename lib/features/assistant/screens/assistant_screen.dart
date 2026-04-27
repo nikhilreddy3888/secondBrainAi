@@ -35,8 +35,23 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
 
     return SectionScaffold(
       title: 'AI Assistant',
+      bodyPadding: EdgeInsets.zero,
       child: Column(
         children: [
+          if (!aiState.initialized)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 12),
+                    Text(aiState.status),
+                  ],
+                ),
+              ),
+            )
+          else ...[
           // ── Download banner ──
           if (!aiState.modelDownloaded) ...[
             Material(
@@ -82,10 +97,32 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
             const SizedBox(height: 12),
           ],
 
+          if (aiState.modelDownloaded && !aiState.modelLoaded) ...[
+            Material(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.memory_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(aiState.status)),
+                    FilledButton(
+                      onPressed: aiController.loadDownloadedModel,
+                      child: const Text('Load'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // ── Mode selector ──
           if (aiState.modelLoaded)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: SegmentedButton<AssistantMode>(
                 style: ButtonStyle(
                   visualDensity: VisualDensity.compact,
@@ -127,27 +164,22 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                         content,
                         mode: _mode,
                         onCitations: (results) {
-                          onCitations?.call(results.whereType<RetrievalResult>().toList());
+                          onCitations?.call(
+                            results.whereType<RetrievalResult>().toList(),
+                          );
                         },
                       );
                     },
-                    initialHistory: widget.initialPrompt != null
-                        ? [
-                            AgentChatMessage(
-                              id: 'init',
-                              content: widget.initialPrompt!,
-                              role: MessageRole.user,
-                              timestamp: DateTime.now(),
-                            ),
-                          ]
-                        : null,
+                    initialPromptToSend: widget.initialPrompt,
                     welcomeMessage: _welcomeForMode(_mode),
                     accentColor: cs.primary,
+                    enableImagePicker: false,
                   )
                 : const Center(
                     child: Text('Model not loaded. Please download or load the model.'),
                   ),
           ),
+          ],
         ],
       ),
     );

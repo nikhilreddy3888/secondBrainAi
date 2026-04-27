@@ -54,6 +54,8 @@ dependencies:
 dependency_overrides:
   runanywhere:
     path: third_party/runanywhere
+  flutter_local_agent_kit:
+    path: third_party/flutter_local_agent_kit
 
 dev_dependencies:
   flutter_test:

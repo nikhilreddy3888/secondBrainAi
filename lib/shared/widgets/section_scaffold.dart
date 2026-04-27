@@ -8,11 +8,13 @@ class SectionScaffold extends StatelessWidget {
     required this.title,
     required this.child,
     this.action,
+    this.bodyPadding = const EdgeInsets.symmetric(horizontal: 16.0),
   });
 
   final String title;
   final Widget child;
   final Widget? action;
+  final EdgeInsetsGeometry bodyPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +42,7 @@ class SectionScaffold extends StatelessWidget {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: bodyPadding,
         child: child,
       ),
       floatingActionButton: action,

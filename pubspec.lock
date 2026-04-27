@@ -297,10 +297,9 @@ packages:
   flutter_local_agent_kit:
     dependency: "direct main"
     description:
-      name: flutter_local_agent_kit
-      sha256: "5c5c190ab680693228b322f89b62261549b356aa41c0c7ce36d8069be44cea88"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/flutter_local_agent_kit"
+      relative: true
+    source: path
     version: "1.1.2"
   flutter_local_notifications:
     dependency: "direct main"
