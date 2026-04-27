@@ -123,9 +123,9 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       await for (final progress in ref.read(aiRepositoryProvider).downloadModel()) {
         state = state.copyWith(
           initialized: true,
-          downloading: !progress.state.isCompleted,
+          downloading: progress.state != DownloadProgressState.completed,
           progress: progress.percentage.clamp(0, 1),
-          status: progress.state.isCompleted
+          status: progress.state == DownloadProgressState.completed
               ? 'Download complete. Loading model...'
               : 'Downloading model ${(progress.percentage * 100).toStringAsFixed(0)}%',
         );
