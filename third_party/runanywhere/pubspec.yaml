@@ -37,15 +37,15 @@ dependencies:
   json_annotation: ^4.9.0
   path: ^1.9.0
   # Archive extraction (tar.bz2, zip)
-  archive: ^3.6.1
+  archive: ^4.0.7
   # TTS fallback (system TTS)
-  flutter_tts: ^3.8.0
+  flutter_tts: ^4.2.5
   # Audio recording for voice sessions
   record: '>=5.1.2 <7.0.0'
   # Audio playback for TTS
   audioplayers: ^6.0.0
   # Permissions
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.1
 
 dev_dependencies:
   flutter_test:
