@@ -16,18 +16,18 @@ ext {
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    commonsVersion = "0.1.6"
+    commonsVersion = "0.2.6"
 
     // =============================================================================
     // Remote binary URLs
-    // RACommons from runanywhere-sdks (NOT runanywhere-binaries)
+    // RACommons from runanywhere-binaries
     // =============================================================================
     commonsGitHubOrg = "RunanywhereAI"
-    commonsRepo = "runanywhere-sdks"
+    commonsRepo = "runanywhere-binaries"
     commonsBaseUrl = "https://github.com/${commonsGitHubOrg}/${commonsRepo}/releases/download"
 
     // Android native libraries package
-    commonsAndroidUrl = "${commonsBaseUrl}/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
+    commonsAndroidUrl = "${commonsBaseUrl}/core-v${commonsVersion}/RABackendONNX-android-v${commonsVersion}.zip"
 
     // Helper method to check if we should download
     // Set to false since native libs are pre-placed in build/jniLibs

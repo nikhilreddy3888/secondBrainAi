@@ -297,6 +297,35 @@ class FlutterLocalAgentKit {
     yield* _llmService!.generateChatStream(messages, maxTokens: maxTokens);
   }
 
+  /// Streams a direct LLM response without invoking RAG retrieval.
+  ///
+  /// Use this for pure chat experiences where external context injection would
+  /// degrade answer quality.
+  Stream<String> askDirectStream(
+    String query, {
+    List<AgentChatMessage> history = const [],
+    List<int>? imageBytes,
+    String? systemPrompt,
+    int? maxTokens,
+  }) async* {
+    if (!isReady) throw Exception('Kit is not ready');
+
+    final messages = [
+      if (systemPrompt != null && systemPrompt.trim().isNotEmpty)
+        AgentChatMessage.system(systemPrompt.trim()),
+      ...history,
+      AgentChatMessage(
+        id: const Uuid().v4(),
+        content: query,
+        role: MessageRole.user,
+        timestamp: DateTime.now(),
+        imageBytes: imageBytes,
+      ),
+    ];
+
+    yield* _llmService!.generateChatStream(messages, maxTokens: maxTokens);
+  }
+
   /// Closes all native engines and releases all held RAM.
   Future<void> dispose() async {
     await _disposeResources();

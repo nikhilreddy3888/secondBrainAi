@@ -1,0 +1,67 @@
+[package]
+name = "rag_engine_flutter"
+version = "0.8.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[features]
+default = []
+vector_faer = ["dep:faer"]
+vector_quant_i8 = []
+
+[dependencies]
+flutter_rust_bridge = "=2.11.1"
+anyhow = "1.0.100"
+thiserror = "1.0"
+rusqlite = { version = "0.32", features = ["bundled"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.25"
+log = "0.4.29"
+once_cell = "1.21"
+lazy_static = "1.4"
+faer = { version = "0.24.0", optional = true, default-features = false, features = ["std", "linalg"] }
+
+# Tokenizer for text preprocessing
+# Using fancy-regex instead of onig for iOS cross-compilation compatibility
+tokenizers = { version = "0.22.2", default-features = false, features = ["fancy-regex", "http"] }
+
+# HNSW vector indexing for O(log n) search
+hnsw_rs = "0.3"
+
+# Serialization for saving/loading index
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+
+# Content hash for deduplication
+sha2 = "0.10"
+
+# Semantic text splitting with Unicode sentence/word boundaries
+text-splitter = { version = "0.29.3", default-features = false }
+
+# Unicode word segmentation for BM25 tokenization (CJK support)
+unicode-segmentation = "1.12"
+
+# Document-to-Text (DTT) - PDF and DOCX text extraction
+pdf-extract = "0.7"
+docx-lite = "0.2"
+
+# Regex for PDF dehyphenation (fix line-break word splits)
+regex = "1.11"
+uuid = { version = "1.20.0", features = ["v4"] }
+
+# Removed 'ort' crate: failed to load libonnxruntime.dylib on iOS
+# ONNX inference moved to Flutter onnxruntime package
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.13"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+oslog = "0.2"
+
+[dev-dependencies]
+tempfile = "3.10"

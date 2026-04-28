@@ -25,7 +25,7 @@ class LlmService {
   /// Generates a streaming response for the given prompt.
   Stream<String> generateStream(
     String prompt, {
-    double temperature = 0.7,
+    double temperature = 0.2,
     int? maxTokens,
   }) {
     return engine.generate(
@@ -42,7 +42,7 @@ class LlmService {
   /// This handles multimodal inputs (images) automatically.
   Stream<String> generateChatStream(
     List<AgentChatMessage> messages, {
-    double temperature = 0.7,
+    double temperature = 0.2,
     int? maxTokens,
   }) {
     // If no images, fallback to faster string-based generation
@@ -56,18 +56,21 @@ class LlmService {
     for (final m in messages) {
       contentParts.add(LlamaTextContent(m.content));
       if (m.imageBytes != null) {
-        contentParts.add(LlamaImageContent(bytes: Uint8List.fromList(m.imageBytes!)));
+        contentParts
+            .add(LlamaImageContent(bytes: Uint8List.fromList(m.imageBytes!)));
       }
     }
 
-    return ChatSession(engine).create(
-      contentParts,
-      params: GenerationParams(
-        temp: temperature,
-        maxTokens: maxTokens ?? 1024,
-        stopSequences: [template.stopSequence],
-      ),
-    ).map((chunk) => chunk.toString());
+    return ChatSession(engine)
+        .create(
+          contentParts,
+          params: GenerationParams(
+            temp: temperature,
+            maxTokens: maxTokens ?? 1024,
+            stopSequences: [template.stopSequence],
+          ),
+        )
+        .map((chunk) => chunk.toString());
   }
 
   /// Formats a list of messages using the active model template.

@@ -60,18 +60,36 @@ Begin!""";
       AgentChatMessage.system(_buildSystemPrompt()),
       AgentChatMessage.user(query),
     ];
+    var usedTool = false;
 
     for (int i = 0; i < maxIterations; i++) {
       final prompt = llm.format(conversation);
 
       String fullResponse = "";
-      await for (final token in llm.generateStream(prompt, maxTokens: maxTokens)) {
+      await for (final token
+          in llm.generateStream(prompt, maxTokens: maxTokens)) {
         fullResponse += token;
       }
 
-      if (fullResponse.contains('Final Answer:')) {
-        yield fullResponse.split('Final Answer:').last.trim();
-        return;
+      final finalAnswerMatch = RegExp(
+        r'Final Answer:\s*(.*)$',
+        caseSensitive: false,
+        multiLine: true,
+        dotAll: true,
+      ).firstMatch(fullResponse);
+      if (finalAnswerMatch != null) {
+        if (usedTool) {
+          yield finalAnswerMatch.group(1)!.trim();
+          return;
+        }
+        conversation.add(AgentChatMessage.assistant(fullResponse));
+        conversation.add(
+          AgentChatMessage.system(
+            'You must call a tool before providing a Final Answer. '
+            'Reply again using the required Action format only.',
+          ),
+        );
+        continue;
       }
 
       final action = _parseAction(fullResponse);
@@ -84,6 +102,7 @@ Begin!""";
           yield "Thinking (using ${tool.name})...";
 
           final observation = await tool.call(toolInput);
+          usedTool = true;
 
           conversation.add(AgentChatMessage.assistant(fullResponse));
           conversation
@@ -96,9 +115,14 @@ Begin!""";
         }
       }
 
-      // If no valid action or answer found, yield the raw response and stop
-      yield fullResponse.replaceAll('Thought:', '').trim();
-      return;
+      // If the model missed the required format, feed the response back in and retry.
+      conversation.add(AgentChatMessage.assistant(fullResponse));
+      conversation.add(
+        AgentChatMessage.system(
+          'Your previous response did not include a valid Action block or Final Answer. '
+          'Reply again using the required format only.',
+        ),
+      );
     }
 
     yield "I've reached my maximum reasoning limit without a final answer.";
@@ -106,15 +130,20 @@ Begin!""";
 
   _ParsedAction? _parseAction(String text) {
     try {
-      final actionMatch = RegExp(r'Action:\s*(.*)').firstMatch(text);
+      final actionMatch = RegExp(
+        r'^Action:\s*(.*)$',
+        caseSensitive: false,
+        multiLine: true,
+      ).firstMatch(text);
       if (actionMatch != null) {
         final name = actionMatch.group(1)?.trim() ?? '';
         final jsonStr = _extractActionInputJson(text);
-        if (name.isEmpty || jsonStr == null) {
+        if (name.isEmpty) {
           return null;
         }
-
-        final input = Map<String, dynamic>.from(json.decode(jsonStr) as Map);
+        final input = jsonStr == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(json.decode(jsonStr) as Map);
         return _ParsedAction(name, input);
       }
     } catch (_) {
@@ -125,7 +154,7 @@ Begin!""";
 
   String? _extractActionInputJson(String text) {
     const marker = 'Action Input:';
-    final markerIndex = text.indexOf(marker);
+    final markerIndex = text.toLowerCase().indexOf(marker.toLowerCase());
     if (markerIndex == -1) return null;
 
     var rest = text.substring(markerIndex + marker.length).trimLeft();

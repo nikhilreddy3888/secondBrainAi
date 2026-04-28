@@ -253,10 +253,12 @@ class DartBridgeLLM {
     final tokens = maxTokens;
     final temp = temperature;
 
-    _logger.debug('[PARAMS] generate: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+    _logger.debug(
+        '[PARAMS] generate: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
 
     final result = await Isolate.run(() {
-      return _generateInIsolate(handleAddress, prompt, tokens, temp, systemPrompt);
+      return _generateInIsolate(
+          handleAddress, prompt, tokens, temp, systemPrompt);
     });
 
     if (result.error != null) {
@@ -293,7 +295,8 @@ class DartBridgeLLM {
     // Create stream controller for emitting tokens to the caller
     final controller = StreamController<String>();
 
-    _logger.debug('[PARAMS] generateStream: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+    _logger.debug(
+        '[PARAMS] generateStream: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
 
     // Start streaming generation in a background isolate
     unawaited(_startBackgroundStreaming(
@@ -325,11 +328,11 @@ class DartBridgeLLM {
   ) async {
     // Create a ReceivePort to receive tokens from the background isolate
     final receivePort = ReceivePort();
-    
+
     // Listen for messages from the background isolate
     receivePort.listen((message) {
       if (controller.isClosed) return;
-      
+
       if (message is String) {
         // It's a token
         controller.add(message);
@@ -468,7 +471,7 @@ SendPort? _isolateSendPort;
 void _streamingIsolateEntry(_StreamingIsolateParams params) {
   // Store the SendPort for callbacks to use
   _isolateSendPort = params.sendPort;
-  
+
   final handle = Pointer<Void>.fromAddress(params.handleAddress);
   final promptPtr = params.prompt.toNativeUtf8();
   final optionsPtr = calloc<RacLlmOptionsStruct>();
@@ -498,10 +501,11 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
         Pointer.fromFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>(
             _isolateTokenCallback, 1);
     final completeCallbackPtr = Pointer.fromFunction<
-        Void Function(
-            Pointer<RacLlmResultStruct>, Pointer<Void>)>(_isolateCompleteCallback);
+        Void Function(Pointer<RacLlmResultStruct>,
+            Pointer<Void>)>(_isolateCompleteCallback);
     final errorCallbackPtr = Pointer.fromFunction<
-        Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>(_isolateErrorCallback);
+        Void Function(
+            Int32, Pointer<Utf8>, Pointer<Void>)>(_isolateErrorCallback);
 
     final generateStreamFn = lib.lookupFunction<
         Int32 Function(
@@ -584,8 +588,10 @@ void _isolateCompleteCallback(
 @pragma('vm:entry-point')
 void _isolateErrorCallback(
     int errorCode, Pointer<Utf8> errorMsg, Pointer<Void> userData) {
-  final message = errorMsg != nullptr ? errorMsg.toDartString() : 'Unknown error';
-  _isolateSendPort?.send(_StreamingMessage(error: 'Generation error ($errorCode): $message'));
+  final message =
+      errorMsg != nullptr ? errorMsg.toDartString() : 'Unknown error';
+  _isolateSendPort?.send(
+      _StreamingMessage(error: 'Generation error ($errorCode): $message'));
 }
 
 // =============================================================================

@@ -172,14 +172,16 @@ extension RunAnywhereToolCalling on RunAnywhere {
     _logger.debug('Using tool call format: $formatName');
 
     // Build initial prompt with tools using the specified format
-    final toolsPrompt = DartBridgeToolCalling.shared.formatToolsPromptWithFormat(
+    final toolsPrompt =
+        DartBridgeToolCalling.shared.formatToolsPromptWithFormat(
       toolsJson,
       formatName,
     );
-    
+
     // Build the full prompt with system instructions and user query
     final formattedPrompt = '$toolsPrompt\n\nUser: $prompt';
-    _logger.debug('Formatted prompt: ${formattedPrompt.substring(0, formattedPrompt.length.clamp(0, 200))}...');
+    _logger.debug(
+        'Formatted prompt: ${formattedPrompt.substring(0, formattedPrompt.length.clamp(0, 200))}...');
 
     // Track all tool calls and results
     final allToolCalls = <ToolCall>[];
@@ -197,19 +199,22 @@ extension RunAnywhereToolCalling on RunAnywhere {
         maxTokens: opts.maxTokens ?? 1024,
         temperature: opts.temperature ?? 0.3,
       );
-      
+
       // Use streaming like Swift does, then collect all tokens
-      final streamResult = await RunAnywhere.generateStream(currentPrompt, options: genOptions);
+      final streamResult =
+          await RunAnywhere.generateStream(currentPrompt, options: genOptions);
       final buffer = StringBuffer();
       await for (final token in streamResult.stream) {
         buffer.write(token);
       }
       final responseText = buffer.toString();
-      
-      _logger.debug('LLM output (iter $iterations): ${responseText.substring(0, responseText.length.clamp(0, 200))}...');
+
+      _logger.debug(
+          'LLM output (iter $iterations): ${responseText.substring(0, responseText.length.clamp(0, 200))}...');
 
       // Parse for tool calls using C++ bridge (auto-detection like Swift)
-      final parseResult = DartBridgeToolCalling.shared.parseToolCall(responseText);
+      final parseResult =
+          DartBridgeToolCalling.shared.parseToolCall(responseText);
 
       if (!parseResult.hasToolCall || parseResult.toolName == null) {
         // No tool call - return final result
@@ -262,7 +267,8 @@ extension RunAnywhereToolCalling on RunAnywhere {
         keepToolsAvailable: opts.keepToolsAvailable,
       );
 
-      _logger.debug('Follow-up prompt: ${currentPrompt.substring(0, currentPrompt.length.clamp(0, 200))}...');
+      _logger.debug(
+          'Follow-up prompt: ${currentPrompt.substring(0, currentPrompt.length.clamp(0, 200))}...');
     }
 
     // Max iterations reached - return what we have

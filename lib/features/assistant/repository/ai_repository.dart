@@ -76,7 +76,7 @@ class AiRepository {
       modelPath: modelPath,
       template: ChatMlTemplate(),
       contextSize: 2048,
-      gpuLayers: Platform.isAndroid || Platform.isIOS ? 32 : 0,
+      gpuLayers: Platform.isAndroid ? 32 : 0,
       customTools: [
         CreateNoteTool(ref, _toolTurnLimiter),
         CreatePasswordTool(ref, _toolTurnLimiter),
@@ -90,7 +90,7 @@ class AiRepository {
 
   Stream<DownloadProgress> downloadModel() async* {
     await initialize();
-    
+
     final modelDir = await DartBridgeModelPaths.instance
         .getModelFolderAndCreate(modelId, InferenceFramework.llamaCpp);
     final url = Uri.parse(modelUrl);
@@ -107,7 +107,9 @@ class AiRepository {
         throw HttpException('HTTP ${response.statusCode}');
       }
 
-      final totalBytes = response.contentLength > 0 ? response.contentLength : 0;
+      final totalBytes = response.contentLength > 0
+          ? response.contentLength
+          : 0;
       var downloadedBytes = 0;
 
       final sink = file.openWrite();
@@ -152,9 +154,11 @@ class AiRepository {
   Future<String> _buildVaultContext() async {
     final vault = await ref.read(vaultControllerProvider.future);
     final lines = <String>[];
-    
+
     // Provide current date so the LLM understands relative time
-    lines.add('CURRENT DATE AND TIME: ${DateTime.now().toString().split('.')[0]}\n');
+    lines.add(
+      'CURRENT DATE AND TIME: ${DateTime.now().toString().split('.')[0]}\n',
+    );
 
     for (final n in vault.notes) {
       lines.add('- Note "${n.title}": ${n.content}');
@@ -165,24 +169,30 @@ class AiRepository {
     for (final e in vault.events) {
       // Format the date to be easily readable for the LLM
       // e.g. "2024-05-12 14:30:00" -> easier to parse than "2024-05-12T14:30:00.000Z"
-      final dateStr = e.startsAt.toString().split('.')[0]; 
-      lines.add('- Event "${e.title}" scheduled for $dateStr: ${e.description}');
+      final dateStr = e.startsAt.toString().split('.')[0];
+      lines.add(
+        '- Event "${e.title}" scheduled for $dateStr: ${e.description}',
+      );
     }
     for (final d in vault.documents) {
       lines.add('- Document "${d.title}": ${d.content}');
     }
 
-    return lines.isNotEmpty ? lines.join('\n') : 'The vault is currently empty.';
+    return lines.isNotEmpty
+        ? lines.join('\n')
+        : 'The vault is currently empty.';
   }
 
   bool _looksLikeCreateIntent(String question) {
     final q = question.toLowerCase();
-    final asksCreate = q.contains('create') ||
+    final asksCreate =
+        q.contains('create') ||
         q.contains('add') ||
         q.contains('save') ||
         q.contains('schedule') ||
         q.contains('new ');
-    final targetType = q.contains('note') ||
+    final targetType =
+        q.contains('note') ||
         q.contains('password') ||
         q.contains('event') ||
         q.contains('document');
@@ -192,7 +202,8 @@ class AiRepository {
   String? _expectedCreateToolForQuestion(String question) {
     final q = question.toLowerCase();
 
-    final asksCreate = q.contains('create') ||
+    final asksCreate =
+        q.contains('create') ||
         q.contains('add') ||
         q.contains('save') ||
         q.contains('schedule') ||
@@ -215,19 +226,28 @@ class AiRepository {
     if (hasExplicitCreateFor(['note', 'notes'])) {
       return 'create_note';
     }
-    if (hasExplicitCreateFor(['password', 'credential', 'credentials', 'login'])) {
+    if (hasExplicitCreateFor([
+      'password',
+      'credential',
+      'credentials',
+      'login',
+    ])) {
       return 'create_password';
     }
-    if (hasExplicitCreateFor(['event', 'events', 'meeting', 'appointment', 'calendar reminder'])) {
+    if (hasExplicitCreateFor([
+      'event',
+      'events',
+      'meeting',
+      'appointment',
+      'calendar reminder',
+    ])) {
       return 'create_event';
     }
     if (hasExplicitCreateFor(['document', 'documents', 'doc', 'file'])) {
       return 'create_document';
     }
 
-    final noteSignals = [
-      q.contains('note'),
-    ].where((e) => e).length;
+    final noteSignals = [q.contains('note')].where((e) => e).length;
     final passwordSignals = [
       q.contains('password'),
       q.contains('credential'),
@@ -280,14 +300,18 @@ class AiRepository {
     final beforeEventIds = before.events.map((e) => e.id).toSet();
     final beforeDocumentIds = before.documents.map((e) => e.id).toSet();
 
-    final createdNotes =
-        after.notes.where((e) => !beforeNoteIds.contains(e.id)).toList();
-    final createdPasswords =
-        after.passwords.where((e) => !beforePasswordIds.contains(e.id)).toList();
-    final createdEvents =
-        after.events.where((e) => !beforeEventIds.contains(e.id)).toList();
-    final createdDocuments =
-        after.documents.where((e) => !beforeDocumentIds.contains(e.id)).toList();
+    final createdNotes = after.notes
+        .where((e) => !beforeNoteIds.contains(e.id))
+        .toList();
+    final createdPasswords = after.passwords
+        .where((e) => !beforePasswordIds.contains(e.id))
+        .toList();
+    final createdEvents = after.events
+        .where((e) => !beforeEventIds.contains(e.id))
+        .toList();
+    final createdDocuments = after.documents
+        .where((e) => !beforeDocumentIds.contains(e.id))
+        .toList();
 
     if (createdNotes.isEmpty &&
         createdPasswords.isEmpty &&
@@ -313,7 +337,8 @@ class AiRepository {
   }
 
   /// Entry point for AgentChatView. Routes based on [AssistantMode].
-  Stream<String> askStream(String question, {
+  Stream<String> askStream(
+    String question, {
     AssistantMode mode = AssistantMode.chat,
     void Function(List<dynamic>)? onCitations,
   }) async* {
@@ -327,7 +352,13 @@ class AiRepository {
     switch (mode) {
       case AssistantMode.chat:
         // Plain chat — no vault context, no tools
-        yield* _kit.askStream(question);
+        yield* _kit.askDirectStream(
+          question,
+          systemPrompt:
+              'You are a helpful on-device assistant. Reply clearly and briefly. '
+              'If the user greets you, respond with a natural greeting and ask how you can help.',
+          maxTokens: 256,
+        );
 
       case AssistantMode.vault:
         // RAG — vault context injected, no tools
@@ -337,7 +368,15 @@ class AiRepository {
             'VAULT DATA:\n$context\n\n'
             'Question: $question\n\n'
             'Answer briefly and directly:';
-        yield* _kit.askStream(prompt, onCitations: onCitations);
+        // Vault mode uses explicitly injected vault context and should not
+        // additionally query the RAG index.
+        yield* _kit.askDirectStream(
+          prompt,
+          systemPrompt:
+              'You are a precise vault assistant. Use only the provided vault data. '
+              'If data is missing, say so clearly.',
+          maxTokens: 384,
+        );
 
       case AssistantMode.agent:
         // Agent — ReAct loop with tools + vault context
@@ -346,63 +385,77 @@ class AiRepository {
         final expectedCreateTool = _expectedCreateToolForQuestion(question);
         _toolTurnLimiter.beginTurn(
           maxCreateActions: 1,
-          allowedCreateTools:
-              expectedCreateTool == null ? null : {expectedCreateTool},
+          allowedCreateTools: expectedCreateTool == null
+              ? null
+              : {expectedCreateTool},
         );
         final toolRestriction = expectedCreateTool == null
             ? ''
             : '\n10. For this specific request, you MUST use only the tool "$expectedCreateTool" for any create action. Do not call other create_* tools.';
         final systemPrompt =
-            'You are a private vault assistant.\n\n'
-            'VAULT DATA:\n$context\n\n'
-            'CRITICAL INSTRUCTIONS:\n'
-            '1. To perform ANY action, you MUST use the exact format:\n'
-            '   Thought: I need to [action]\n'
-            '   Action: [tool_name]\n'
-            '   Action Input: {"arg1": "value1"}\n'
-            '2. DO NOT use python function syntax like tool(args).\n'
-            '3. DO NOT use markdown code blocks like ```json.\n'
-            '4. NEVER say you have done something (e.g. "I created...") until you see an "Observation: Successfully created..." message.\n'
-            '5. If Observation contains "Failed" or any error text, explicitly tell the user the action was NOT completed.\n'
-            '6. Once you see the success Observation, use "Final Answer:" to tell the user it is done.\n'
-            '7. If you do not use the "Action:" format, no tool will be called and nothing will happen.\n'
-            '8. Never claim notes/passwords/events/documents were created without a success Observation containing an item id.\n'
-            '9. You are allowed to execute at most one create action for this request. After one successful creation, stop and provide Final Answer.'
-            '$toolRestriction';
+          'You are a private vault assistant.\n\n'
+          'VAULT DATA:\n$context\n\n'
+          'CRITICAL INSTRUCTIONS:\n'
+          '1. Agent mode is ONLY for tool calling. You MUST call a tool; never answer directly.\n'
+          '2. To perform ANY action, you MUST use the exact format:\n'
+          '   Thought: I need to [action]\n'
+          '   Action: [tool_name]\n'
+          '   Action Input: {"arg1": "value1"}\n'
+          '3. DO NOT use python function syntax like tool(args).\n'
+          '4. DO NOT use markdown code blocks like ```json.\n'
+          '5. NEVER say you have done something (e.g. "I created...") until you see an "Observation: Successfully created..." message.\n'
+          '6. If Observation contains "Failed" or any error text, explicitly tell the user the action was NOT completed.\n'
+          '7. Once you see the success Observation, use "Final Answer:" to tell the user it is done.\n'
+          '8. If you do not use the "Action:" format, no tool will be called and nothing will happen.\n'
+          '9. Never claim notes/passwords/events/documents were created without a success Observation containing an item id.\n'
+          '10. You are allowed to execute at most one create action for this request. After one successful creation, stop and provide Final Answer.'
+          '$toolRestriction';
         try {
-          await for (final token
-              in _kit.runAgent(question, systemPrompt: systemPrompt)) {
+          await for (final token in _kit.runAgent(
+            question,
+            systemPrompt: systemPrompt,
+          )) {
             yield token;
           }
 
           final afterVault = await ref.read(vaultControllerProvider.future);
-          final verifiedSummary =
-              _buildVerifiedCreationSummary(beforeVault, afterVault);
+          final verifiedSummary = _buildVerifiedCreationSummary(
+            beforeVault,
+            afterVault,
+          );
           if (verifiedSummary != null) {
             yield '\n\n$verifiedSummary';
           } else if (_looksLikeCreateIntent(question)) {
             var previousVault = afterVault;
             String? retrySummary;
 
-            for (var attempt = 2;
-                attempt <= _maxAgentVerificationAttempts && retrySummary == null;
-                attempt++) {
-              yield '\n\nI could not verify an item ID from attempt ${attempt - 1}.'
-                  ' Retrying (attempt $attempt/$_maxAgentVerificationAttempts).';
+            for (
+              var attempt = 2;
+              attempt <= _maxAgentVerificationAttempts && retrySummary == null;
+              attempt++
+            ) {
+              yield '\n\nThinking...';
 
               _toolTurnLimiter.beginTurn(
                 maxCreateActions: 1,
-                allowedCreateTools:
-                    expectedCreateTool == null ? null : {expectedCreateTool},
+                allowedCreateTools: expectedCreateTool == null
+                    ? null
+                    : {expectedCreateTool},
               );
-              await for (final token
-                  in _kit.runAgent(question, systemPrompt: systemPrompt)) {
+              await for (final token in _kit.runAgent(
+                question,
+                systemPrompt: systemPrompt,
+              )) {
                 yield token;
               }
 
-              final currentVault = await ref.read(vaultControllerProvider.future);
-              retrySummary =
-                  _buildVerifiedCreationSummary(previousVault, currentVault);
+              final currentVault = await ref.read(
+                vaultControllerProvider.future,
+              );
+              retrySummary = _buildVerifiedCreationSummary(
+                previousVault,
+                currentVault,
+              );
               previousVault = currentVault;
             }
 
