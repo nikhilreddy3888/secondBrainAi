@@ -131,7 +131,15 @@ class PlatformLoader {
   /// - With static linkage, symbols from xcframeworks become local ('t' in nm)
   /// - This is the correct approach for statically linked Flutter plugins
   static DynamicLibrary _loadIOS(String libraryName) {
-    return DynamicLibrary.executable();
+    try {
+      // Try to load as a dynamic framework first
+      // Note: Even if RACommons is a static library, CocoaPods can wrap it
+      // in a dynamic framework bundle if use_frameworks! is used.
+      return DynamicLibrary.open('RACommons.framework/RACommons');
+    } catch (e) {
+      // Fallback to executable for statically linked builds
+      return DynamicLibrary.executable();
+    }
   }
 
   /// Load on macOS for development/testing.

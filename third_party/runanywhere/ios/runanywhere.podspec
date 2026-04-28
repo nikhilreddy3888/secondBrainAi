@@ -14,7 +14,7 @@
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-COMMONS_VERSION = "0.1.6"
+COMMONS_VERSION = "0.18.0"
 
 # =============================================================================
 # Binary Source - RACommons from runanywhere-sdks
@@ -72,37 +72,37 @@ https://github.com/RunanywhereAI/runanywhere-sdks
       if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
         CURRENT_VERSION=$(cat "$VERSION_FILE")
         if [ "$CURRENT_VERSION" = "$VERSION" ]; then
-          echo "✅ RACommons.xcframework version $VERSION already downloaded"
+          echo "RACommons.xcframework version $VERSION already downloaded"
           exit 0
         fi
       fi
 
-      echo "📦 Downloading RACommons.xcframework version $VERSION..."
+      echo "Downloading RACommons.xcframework version $VERSION..."
 
       mkdir -p "$FRAMEWORK_DIR"
       rm -rf "$FRAMEWORK_DIR/RACommons.xcframework"
 
       # Download from runanywhere-sdks
-      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$VERSION/RACommons-ios-v$VERSION.zip"
+      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/v$VERSION/RACommons-ios-v$VERSION.zip"
       ZIP_FILE="/tmp/RACommons.zip"
 
       echo "   URL: $DOWNLOAD_URL"
 
       curl -L -f -o "$ZIP_FILE" "$DOWNLOAD_URL" || {
-        echo "❌ Failed to download RACommons from $DOWNLOAD_URL"
+        echo "Failed to download RACommons from $DOWNLOAD_URL"
         exit 1
       }
 
-      echo "📂 Extracting RACommons.xcframework..."
+      echo "Extracting RACommons.xcframework..."
       unzip -q -o "$ZIP_FILE" -d "$FRAMEWORK_DIR/"
       rm -f "$ZIP_FILE"
 
       echo "$VERSION" > "$VERSION_FILE"
 
       if [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
-        echo "✅ RACommons.xcframework installed successfully"
+        echo "RACommons.xcframework installed successfully"
       else
-        echo "❌ RACommons.xcframework extraction failed"
+        echo "RACommons.xcframework extraction failed"
         exit 1
       fi
     CMD
@@ -157,10 +157,10 @@ https://github.com/RunanywhereAI/runanywhere-sdks
   # own symbols are not accidentally hidden.
   s.user_target_xcconfig = {
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -ObjC -all_load -Wl,-export_dynamic',
+    'OTHER_LDFLAGS' => '$(inherited) -lc++ -larchive -lbz2 -ObjC',
     'DEAD_CODE_STRIPPING' => 'NO',
   }
 
   # Mark static framework for proper linking
-  s.static_framework = true
+  s.static_framework = false
 end
