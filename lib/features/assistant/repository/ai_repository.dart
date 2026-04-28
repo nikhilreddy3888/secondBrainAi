@@ -24,6 +24,8 @@ class AiRepository {
   static const modelName = 'Qwen 2.5 0.5B (400 MB)';
   static const modelUrl =
       'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf';
+  static const int expectedModelSize = 491400032;
+  static const bool localOnly = false;
 
   final FlutterLocalAgentKit _kit = FlutterLocalAgentKit();
   bool _initialized = false;
@@ -52,7 +54,16 @@ class AiRepository {
         .getModelFolderAndCreate(modelId, InferenceFramework.llamaCpp);
     final filePath = '$modelDir/${Uri.parse(modelUrl).pathSegments.last}';
     final file = File(filePath);
-    return await file.exists() ? file.path : null;
+    if (await file.exists()) {
+      final size = await file.length();
+      if (size == expectedModelSize) {
+        return file.path;
+      } else {
+        // Corrupted or incomplete file, delete it
+        await file.delete();
+      }
+    }
+    return null;
   }
 
   Future<void>? _loadFuture;
