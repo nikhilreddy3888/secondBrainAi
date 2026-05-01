@@ -10,6 +10,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../models/vault_model.dart';
+import '../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../shared/widgets/section_scaffold.dart';
 import '../../vault/controller/vault_controller.dart';
 
@@ -86,10 +87,17 @@ class DocumentsScreen extends ConsumerWidget {
                         ),
                         IconButton(
                           tooltip: 'Delete document',
-                          onPressed: () {
-                            ref
-                                .read(vaultControllerProvider.notifier)
-                                .deleteDocument(doc.id);
+                          onPressed: () async {
+                            final confirmed = await showDeleteConfirmation(
+                              context,
+                              itemType: 'Document',
+                              itemName: doc.title,
+                            );
+                            if (confirmed) {
+                              ref
+                                  .read(vaultControllerProvider.notifier)
+                                  .deleteDocument(doc.id);
+                            }
                           },
                           icon: const Icon(Icons.delete_outline),
                         ),

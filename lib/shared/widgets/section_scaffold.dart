@@ -8,12 +8,14 @@ class SectionScaffold extends StatelessWidget {
     required this.title,
     required this.child,
     this.action,
+    this.actions,
     this.bodyPadding = const EdgeInsets.symmetric(horizontal: 16.0),
   });
 
   final String title;
   final Widget child;
   final Widget? action;
+  final List<Widget>? actions;
   final EdgeInsetsGeometry bodyPadding;
 
   @override
@@ -40,6 +42,7 @@ class SectionScaffold extends StatelessWidget {
             color: theme.appBarTheme.foregroundColor,
           ),
         ),
+        actions: actions,
       ),
       body: Padding(
         padding: bodyPadding,

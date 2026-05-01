@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme.dart';
+import '../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../documents/screens/documents_screen.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../vault/controller/vault_controller.dart';
@@ -439,8 +440,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 ),
                                 const SizedBox(width: 16),
                                 InkWell(
-                                  onTap: () {
-                                    ref.read(vaultControllerProvider.notifier).deleteNote(note.id);
+                                  onTap: () async {
+                                    final confirmed = await showDeleteConfirmation(
+                                      context,
+                                      itemType: 'Note',
+                                      itemName: note.title,
+                                    );
+                                    if (confirmed && context.mounted) {
+                                      ref.read(vaultControllerProvider.notifier).deleteNote(note.id);
+                                    }
                                   },
                                   child: Icon(
                                     Icons.delete_outline,

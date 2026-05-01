@@ -22,6 +22,7 @@ A new Flutter FFI plugin project.
   s.dependency 'Flutter'
   s.platform = :ios, '11.0'
   s.swift_version = '5.0'
+  s.library = 'sqlite3'
 
   s.script_phase = {
     :name => 'Build Rust library',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/vault_model.dart';
+import '../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../shared/widgets/section_scaffold.dart';
 import '../../vault/controller/vault_controller.dart';
 
@@ -63,12 +64,19 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: PopupMenuButton<String>(
-                          onSelected: (value) {
+                          onSelected: (value) async {
                             if (value == 'edit') _showNoteDialog(note);
                             if (value == 'delete') {
-                              ref
-                                  .read(vaultControllerProvider.notifier)
-                                  .deleteNote(note.id);
+                              final confirmed = await showDeleteConfirmation(
+                                context,
+                                itemType: 'Note',
+                                itemName: note.title,
+                              );
+                              if (confirmed) {
+                                ref
+                                    .read(vaultControllerProvider.notifier)
+                                    .deleteNote(note.id);
+                              }
                             }
                           },
                           itemBuilder: (context) => const [

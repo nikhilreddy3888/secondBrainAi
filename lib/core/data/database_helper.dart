@@ -31,9 +31,10 @@ class DatabaseHelper {
     try {
       return await openDatabase(
         path,
-        version: 1,
+        version: 2,
         password: password,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       );
     } catch (e) {
       // If the database file exists but can't be opened (e.g. old unencrypted
@@ -44,9 +45,10 @@ class DatabaseHelper {
       }
       return await openDatabase(
         path,
-        version: 1,
+        version: 2,
         password: password,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       );
     }
   }
@@ -101,6 +103,53 @@ class DatabaseHelper {
         created_at TEXT NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        model_id TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'chat',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          model_id TEXT NOT NULL,
+          mode TEXT NOT NULL DEFAULT 'chat',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          timestamp TEXT NOT NULL,
+          FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+        )
+      ''');
+    }
   }
 
   Future<void> close() async {

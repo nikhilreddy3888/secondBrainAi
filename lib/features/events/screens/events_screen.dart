@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../models/vault_model.dart';
+import '../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../shared/widgets/section_scaffold.dart';
 import '../../vault/controller/vault_controller.dart';
 
@@ -68,10 +69,17 @@ class EventsScreen extends ConsumerWidget {
                         ),
                       ),
                       trailing: PopupMenuButton<String>(
-                    onSelected: (value) {
+                    onSelected: (value) async {
                       if (value == 'edit') _showEventDialog(context, ref, event);
                       if (value == 'delete') {
-                        ref.read(vaultControllerProvider.notifier).deleteEvent(event.id);
+                        final confirmed = await showDeleteConfirmation(
+                          context,
+                          itemType: 'Event',
+                          itemName: event.title,
+                        );
+                        if (confirmed) {
+                          ref.read(vaultControllerProvider.notifier).deleteEvent(event.id);
+                        }
                       }
                     },
                     itemBuilder: (context) => const [

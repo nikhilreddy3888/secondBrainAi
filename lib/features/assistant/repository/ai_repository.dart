@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import 'package:runanywhere/native/dart_bridge.dart';
 
 import '../../../models/vault_model.dart';
 import '../../vault/controller/vault_controller.dart';
+import 'ai_model_registry.dart';
 import 'assistant_tools.dart';
 
 final aiRepositoryProvider = Provider<AiRepository>((ref) {
@@ -20,16 +22,37 @@ class AiRepository {
   final AgentToolTurnLimiter _toolTurnLimiter = AgentToolTurnLimiter();
   static const int _maxAgentVerificationAttempts = 10;
 
-  static const modelId = 'qwen2.5-0.5b-instruct-q4';
-  static const modelName = 'Qwen 2.5 0.5B (400 MB)';
-  static const modelUrl =
-      'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf';
-  static const int expectedModelSize = 491400032;
+  /// The currently selected model (persisted across controller rebuilds).
+  AiModelInfo _selectedModel = AiModelRegistry.defaultModel;
+  AiModelInfo get selectedModel => _selectedModel;
+
+  /// Human-readable display name for status messages.
+  String get modelName => _selectedModel.displayName;
+
   static const bool localOnly = false;
 
   final FlutterLocalAgentKit _kit = FlutterLocalAgentKit();
   bool _initialized = false;
   bool _kitInitialized = false;
+
+  /// ── Session conversation history ──
+  /// History is now passed directly to askStream by the caller to keep
+  /// the repository stateless and allow proper persistence management.
+
+  /// ── Model selection ──
+
+  /// Switches to a different model. Returns `true` if the model changed.
+  /// The caller is responsible for re-downloading / re-loading after switching.
+  bool selectModel(String modelId) {
+    final model = AiModelRegistry.findById(modelId);
+    if (model.id == _selectedModel.id) return false;
+    _selectedModel = model;
+    // Invalidate the loaded state so the runtime controller knows it needs
+    // to re-download / re-load.
+    _kitInitialized = false;
+    _loadFuture = null;
+    return true;
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -44,19 +67,23 @@ class AiRepository {
     _initialized = true;
   }
 
-  Future<bool> isModelDownloaded() async {
+  Future<bool> isModelDownloaded([String? modelId]) async {
     await initialize();
-    return (await _getExistingModelFilePath()) != null;
+    return (await _getExistingModelFilePath(modelId)) != null;
   }
 
-  Future<String?> _getExistingModelFilePath() async {
+  Future<String?> _getExistingModelFilePath([String? modelId]) async {
+    final model = modelId != null ? AiModelRegistry.findById(modelId) : _selectedModel;
     final modelDir = await DartBridgeModelPaths.instance
-        .getModelFolderAndCreate(modelId, InferenceFramework.llamaCpp);
-    final filePath = '$modelDir/${Uri.parse(modelUrl).pathSegments.last}';
+        .getModelFolderAndCreate(model.id, InferenceFramework.llamaCpp);
+    final filePath = '$modelDir/${model.fileName}';
     final file = File(filePath);
     if (await file.exists()) {
       final size = await file.length();
-      if (size == expectedModelSize) {
+      // Sanity check: a valid GGUF model should be at least 1 MB.
+      // We no longer require an exact byte count so we can support
+      // a large registry of models without hardcoding every file size.
+      if (size > 1024 * 1024) {
         return file.path;
       } else {
         // Corrupted or incomplete file, delete it
@@ -75,6 +102,19 @@ class AiRepository {
     });
   }
 
+  PromptTemplate _templateForModel(AiModelInfo model) {
+    switch (model.templateType) {
+      case 'chatml':
+        return ChatMlTemplate();
+      case 'llama3':
+        return Llama3Template();
+      case 'gemma':
+        return GemmaTemplate();
+      default:
+        return ChatMlTemplate();
+    }
+  }
+
   Future<void> _loadModelInternal() async {
     await initialize();
     final modelPath = await _getExistingModelFilePath();
@@ -82,11 +122,13 @@ class AiRepository {
       throw StateError('Model file not found. Download the model first.');
     }
 
-    // Initialize the Agent Kit with ChatML template (required for Qwen models)
+    final model = _selectedModel;
+
+    // Initialize the Agent Kit with the correct template for the selected model
     await _kit.initialize(
       modelPath: modelPath,
-      template: ChatMlTemplate(),
-      contextSize: 2048,
+      template: _templateForModel(model),
+      contextSize: model.contextSize,
       gpuLayers: Platform.isAndroid ? 32 : 0,
       customTools: [
         CreateNoteTool(ref, _toolTurnLimiter),
@@ -102,9 +144,10 @@ class AiRepository {
   Stream<DownloadProgress> downloadModel() async* {
     await initialize();
 
+    final model = _selectedModel;
     final modelDir = await DartBridgeModelPaths.instance
-        .getModelFolderAndCreate(modelId, InferenceFramework.llamaCpp);
-    final url = Uri.parse(modelUrl);
+        .getModelFolderAndCreate(model.id, InferenceFramework.llamaCpp);
+    final url = Uri.parse(model.downloadUrl);
     final filePath = '$modelDir/${url.pathSegments.last}';
     final file = File(filePath);
     await file.parent.create(recursive: true);
@@ -347,11 +390,23 @@ class AiRepository {
     return lines.join('\n');
   }
 
+  /// Trims session history to stay within the model's context window.
+  /// Keeps the most recent messages (drops oldest user/assistant pairs first).
+  List<AgentChatMessage> _getRecentHistory(List<AgentChatMessage> history, {int maxMessages = 20}) {
+    if (history.length <= maxMessages) {
+      return List.from(history);
+    }
+    // Keep only the most recent messages
+    return history.sublist(history.length - maxMessages);
+  }
+
   /// Entry point for AgentChatView. Routes based on [AssistantMode].
   Stream<String> askStream(
     String question, {
     AssistantMode mode = AssistantMode.chat,
     void Function(List<dynamic>)? onCitations,
+    List<AgentChatMessage> history = const [],
+    String? sessionId,
   }) async* {
     if (!_kitInitialized) await loadModel();
 
@@ -360,20 +415,36 @@ class AiRepository {
       return;
     }
 
+    // History trimming is now applied per-request based on the passed history.
+
+    final responseBuffer = StringBuffer();
+    // Unique marker to force context reset between different sessions
+    final sessionMarker = sessionId != null ? 'Session Context ID: $sessionId\n' : '';
+
     switch (mode) {
       case AssistantMode.chat:
-        // Plain chat — no vault context, no tools
+        // Plain chat with session context — pass recent history so the LLM
+        // understands prior conversation turns.
+        final trimmedHistory = _getRecentHistory(history);
         yield* _kit.askDirectStream(
           question,
+          history: trimmedHistory,
           systemPrompt:
-              'You are a helpful on-device assistant. Reply clearly and briefly. '
-              'If the user greets you, respond with a natural greeting and ask how you can help.',
-          maxTokens: 256,
+              '$sessionMarker'
+              'You are a personal, private AI assistant running locally on the user\'s device. '
+              'The user will share personal details (like their name) to help you assist them better. '
+              'You MUST remember and use this information from the conversation history. '
+              'If the user tells you their name, greet them by it and remember it for future questions. '
+              'Never say you don\'t have access to personal information—you have access to what the user tells you in this chat.',
+          maxTokens: 512,
+        ).transform(
+          _tapStream((token) => responseBuffer.write(token)),
         );
 
       case AssistantMode.vault:
-        // RAG — vault context injected, no tools
+        // RAG — vault context injected, no tools, with session history
         final context = await _buildVaultContext();
+        final trimmedHistory = _getRecentHistory(history);
         final prompt =
             'You are a helpful vault assistant. NEVER generate code.\n\n'
             'VAULT DATA:\n$context\n\n'
@@ -383,10 +454,15 @@ class AiRepository {
         // additionally query the RAG index.
         yield* _kit.askDirectStream(
           prompt,
+          history: trimmedHistory,
           systemPrompt:
+              '$sessionMarker'
               'You are a precise vault assistant. Use only the provided vault data. '
-              'If data is missing, say so clearly.',
-          maxTokens: 384,
+              'If data is missing, say so clearly. '
+              'Remember everything the user tells you during this conversation.',
+          maxTokens: 512,
+        ).transform(
+          _tapStream((token) => responseBuffer.write(token)),
         );
 
       case AssistantMode.agent:
@@ -426,6 +502,7 @@ class AiRepository {
             question,
             systemPrompt: systemPrompt,
           )) {
+            responseBuffer.write(token);
             yield token;
           }
 
@@ -435,6 +512,7 @@ class AiRepository {
             afterVault,
           );
           if (verifiedSummary != null) {
+            responseBuffer.write('\n\n$verifiedSummary');
             yield '\n\n$verifiedSummary';
           } else if (_looksLikeCreateIntent(question)) {
             var previousVault = afterVault;
@@ -457,6 +535,7 @@ class AiRepository {
                 question,
                 systemPrompt: systemPrompt,
               )) {
+                responseBuffer.write(token);
                 yield token;
               }
 
@@ -471,11 +550,14 @@ class AiRepository {
             }
 
             if (retrySummary != null) {
+              responseBuffer.write('\n\n$retrySummary');
               yield '\n\n$retrySummary';
             } else {
-              yield '\n\nI could not verify a created item ID after '
+              const msg = '\n\nI could not verify a created item ID after '
                   '$_maxAgentVerificationAttempts attempts. '
                   'Please resend with explicit fields like title and content.';
+              responseBuffer.write(msg);
+              yield msg;
             }
           }
         } finally {
@@ -485,6 +567,16 @@ class AiRepository {
   }
 
   bool get isModelLoaded => _kitInitialized;
+
+  /// Helper to tap into a stream without consuming it.
+  StreamTransformer<String, String> _tapStream(void Function(String) onData) {
+    return StreamTransformer<String, String>.fromHandlers(
+      handleData: (data, sink) {
+        onData(data);
+        sink.add(data);
+      },
+    );
+  }
 }
 
 /// The three operating modes for the AI assistant.

@@ -6,6 +6,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../models/vault_model.dart';
+import '../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../shared/widgets/section_scaffold.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../vault/controller/vault_controller.dart';
@@ -105,12 +106,19 @@ class PasswordsScreen extends ConsumerWidget {
                       icon: const Icon(Icons.visibility_outlined),
                     ),
                     PopupMenuButton<String>(
-                      onSelected: (value) {
+                      onSelected: (value) async {
                         if (value == 'edit') _showPasswordDialog(context, ref, password);
                         if (value == 'delete') {
-                          ref
-                              .read(vaultControllerProvider.notifier)
-                              .deletePassword(password.id);
+                          final confirmed = await showDeleteConfirmation(
+                            context,
+                            itemType: 'Password',
+                            itemName: password.accountName,
+                          );
+                          if (confirmed) {
+                            ref
+                                .read(vaultControllerProvider.notifier)
+                                .deletePassword(password.id);
+                          }
                         }
                       },
                       itemBuilder: (context) => const [
