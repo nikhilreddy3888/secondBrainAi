@@ -93,6 +93,22 @@ class AiRepository {
     return null;
   }
 
+  Future<void> deleteModel(String modelId) async {
+    await initialize();
+    final model = AiModelRegistry.findById(modelId);
+    final modelDir = await DartBridgeModelPaths.instance
+        .getModelFolderAndCreate(model.id, InferenceFramework.llamaCpp);
+    final filePath = '$modelDir/${model.fileName}';
+    final file = File(filePath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+    if (modelId == _selectedModel.id) {
+      _kitInitialized = false;
+      _loadFuture = null;
+    }
+  }
+
   Future<void>? _loadFuture;
 
   Future<void> loadModel() {
@@ -235,6 +251,93 @@ class AiRepository {
     return lines.isNotEmpty
         ? lines.join('\n')
         : 'The vault is currently empty.';
+  }
+
+  /// Identifies which vault items are relevant to the user's question.
+  /// Uses word-boundary matching on the question text to avoid false positives
+  /// from common words appearing in the AI response.
+  List<RetrievalResult> _extractVaultSources(
+    String question,
+    String response,
+    VaultData vault,
+  ) {
+    final questionLower = question.toLowerCase();
+    final responseLower = response.toLowerCase();
+    final results = <RetrievalResult>[];
+    final seenIds = <String>{};
+
+    bool _matches(String title) {
+      if (title.length < 3) return false;
+      final titleLower = title.toLowerCase();
+      // Primary: title words appear in the user's question
+      if (questionLower.contains(titleLower)) return true;
+      // Secondary: the AI quoted the title exactly (e.g. "Grocery List1")
+      if (responseLower.contains('"$titleLower"') ||
+          responseLower.contains("'$titleLower'") ||
+          responseLower.contains('\"$titleLower\"')) {
+        return true;
+      }
+      return false;
+    }
+
+    for (final n in vault.notes) {
+      if (_matches(n.title) && seenIds.add(n.id)) {
+        results.add(RetrievalResult(
+          content: n.content.length > 80
+              ? '${n.content.substring(0, 80)}\u2026'
+              : n.content,
+          source: SourceMetadata(
+            title: '\ud83d\udcdd Note: ${n.title}',
+            filePath: 'vault://notes/${n.id}',
+          ),
+          score: 1.0,
+        ));
+      }
+    }
+
+    for (final p in vault.passwords) {
+      if (_matches(p.accountName) && seenIds.add(p.id)) {
+        results.add(RetrievalResult(
+          content: 'Account: ${p.accountName}',
+          source: SourceMetadata(
+            title: '\ud83d\udd10 Password: ${p.accountName}',
+            filePath: 'vault://passwords/${p.id}',
+          ),
+          score: 1.0,
+        ));
+      }
+    }
+
+    for (final e in vault.events) {
+      if (_matches(e.title) && seenIds.add(e.id)) {
+        final dateStr = e.startsAt.toString().split('.')[0];
+        results.add(RetrievalResult(
+          content: '$dateStr \u2014 ${e.description}',
+          source: SourceMetadata(
+            title: '\ud83d\udcc5 Event: ${e.title}',
+            filePath: 'vault://events/${e.id}',
+          ),
+          score: 1.0,
+        ));
+      }
+    }
+
+    for (final d in vault.documents) {
+      if (_matches(d.title) && seenIds.add(d.id)) {
+        results.add(RetrievalResult(
+          content: d.content.length > 80
+              ? '${d.content.substring(0, 80)}\u2026'
+              : d.content,
+          source: SourceMetadata(
+            title: '\ud83d\udcc4 Document: ${d.title}',
+            filePath: 'vault://documents/${d.id}',
+          ),
+          score: 1.0,
+        ));
+      }
+    }
+
+    return results;
   }
 
   bool _looksLikeCreateIntent(String question) {
@@ -444,6 +547,7 @@ class AiRepository {
       case AssistantMode.vault:
         // RAG — vault context injected, no tools, with session history
         final context = await _buildVaultContext();
+        final vault = await ref.read(vaultControllerProvider.future);
         final trimmedHistory = _getRecentHistory(history);
         final prompt =
             'You are a helpful vault assistant. NEVER generate code.\n\n'
@@ -464,6 +568,23 @@ class AiRepository {
         ).transform(
           _tapStream((token) => responseBuffer.write(token)),
         );
+        // After response streaming completes, extract vault sources and
+        // emit them as citations so the UI shows reference chips.
+        final responseText = responseBuffer.toString();
+        print('VaultQA: Response length = ${responseText.length}');
+        print('VaultQA: Question = "$question"');
+        print('VaultQA: Vault has ${vault.notes.length} notes, ${vault.passwords.length} passwords, ${vault.events.length} events, ${vault.documents.length} documents');
+        final vaultSources = _extractVaultSources(question, responseText, vault);
+        print('VaultQA: Extracted ${vaultSources.length} sources');
+        for (final s in vaultSources) {
+          print('VaultQA: Source → ${s.source.title}');
+        }
+        if (vaultSources.isNotEmpty) {
+          onCitations?.call(vaultSources);
+          print('VaultQA: onCitations called with ${vaultSources.length} sources');
+        } else {
+          print('VaultQA: No sources found to cite');
+        }
 
       case AssistantMode.agent:
         // Agent — ReAct loop with tools + vault context

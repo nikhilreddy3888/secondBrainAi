@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/security/biometric_auth.dart';
 import '../../../models/vault_model.dart';
 import '../../../shared/widgets/section_scaffold.dart';
+import '../../events/screens/events_screen.dart';
 import '../../documents/screens/documents_screen.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../vault/controller/vault_controller.dart';
@@ -156,36 +156,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         final event =
             vault.events.where((item) => item.id == result.id).firstOrNull;
         if (event != null && context.mounted) {
-          _showEvent(context, event);
+          _showEvent(context, ref, event);
         }
         return;
     }
   }
 
-  void _showEvent(BuildContext context, VaultEvent event) {
-    showDialog<void>(
+  Future<void> _showEvent(BuildContext context, WidgetRef ref, VaultEvent event) async {
+    final result = await showDialog<VaultEvent>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(event.title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(DateFormat.yMMMd().add_jm().format(event.startsAt)),
-            if (event.description.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SelectableText(event.description),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+      builder: (context) => EventDialog(event: event),
     );
+    if (result == null || result.title.isEmpty) return;
+    await ref.read(vaultControllerProvider.notifier).upsertEvent(result);
   }
 
   Future<void> _showSecret(

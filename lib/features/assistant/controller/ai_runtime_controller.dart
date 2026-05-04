@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../repository/ai_model_registry.dart';
 import '../repository/ai_repository.dart';
@@ -62,6 +63,9 @@ class AiRuntimeState {
 }
 
 class AiRuntimeController extends Notifier<AiRuntimeState> {
+  static const _storage = FlutterSecureStorage();
+  static const _selectedModelKey = 'assistant_selected_model_id';
+
   @override
   AiRuntimeState build() {
     return AiRuntimeState(
@@ -75,6 +79,13 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       final repo = ref.read(aiRepositoryProvider);
       await repo.initialize();
       await refreshDownloadedModels();
+      final selectedModelId = await _resolveStartupModelId();
+      final changed = repo.selectModel(selectedModelId);
+      if (changed || state.selectedModelId != selectedModelId) {
+        state = state.copyWith(selectedModelId: selectedModelId);
+      }
+      await _persistSelectedModelId(selectedModelId);
+
       final downloaded = await repo.isModelDownloaded();
 
       if (!downloaded) {
@@ -112,6 +123,29 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
     }
   }
 
+  Future<String> _resolveStartupModelId() async {
+    final downloaded = state.downloadedModels;
+    final persisted = await _storage.read(key: _selectedModelKey);
+
+    if (persisted != null && downloaded.contains(persisted)) {
+      return persisted;
+    }
+
+    if (downloaded.length == 1) {
+      return downloaded.first;
+    }
+
+    if (downloaded.contains(AiModelRegistry.defaultModel.id)) {
+      return AiModelRegistry.defaultModel.id;
+    }
+
+    if (downloaded.isNotEmpty) {
+      return downloaded.first;
+    }
+
+    return AiModelRegistry.defaultModel.id;
+  }
+
   Future<void> refreshDownloadedModels() async {
     final repo = ref.read(aiRepositoryProvider);
     final downloaded = <String>{};
@@ -147,6 +181,8 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
     final repo = ref.read(aiRepositoryProvider);
     final changed = repo.selectModel(modelId);
     if (!changed) return;
+
+    await _persistSelectedModelId(modelId);
 
     state = state.copyWith(
       selectedModelId: modelId,
@@ -248,4 +284,33 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       );
     }
   }
+
+  Future<void> deleteModel(String modelId) async {
+    final repo = ref.read(aiRepositoryProvider);
+    try {
+      await repo.deleteModel(modelId);
+      await refreshDownloadedModels();
+      
+      if (state.selectedModelId == modelId) {
+        final fallbackModelId = await _resolveStartupModelId();
+        final changed = repo.selectModel(fallbackModelId);
+        await _persistSelectedModelId(fallbackModelId);
+        state = state.copyWith(
+          selectedModelId: fallbackModelId,
+          modelDownloaded: false,
+          modelLoaded: false,
+          progress: 0,
+          status: 'Model deleted. Download ${repo.modelName} to enable AI answers.',
+        );
+      }
+    } catch (error) {
+      state = state.copyWith(
+        error: 'Failed to delete model: $error',
+      );
+    }
+  }
+
+    Future<void> _persistSelectedModelId(String modelId) async {
+      await _storage.write(key: _selectedModelKey, value: modelId);
+    }
 }

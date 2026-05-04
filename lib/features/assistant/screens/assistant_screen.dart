@@ -23,16 +23,22 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
   AssistantMode _mode = AssistantMode.chat;
   Key _chatViewKey = UniqueKey();
   bool _initialPromptProcessed = false;
+  bool _isInitializing = true;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
+    Future.microtask(() async {
       ref.read(aiRuntimeControllerProvider.notifier).bootstrap();
       final chatController = ref.read(chatSessionControllerProvider.notifier);
-      chatController.loadSessions();
+      await chatController.loadSessions();
       // Always start fresh when entering the assistant screen from dashboard/elsewhere
       chatController.startNewSession();
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
     });
   }
 
@@ -230,9 +236,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
 
           // ── Chat view ──
           Expanded(
-            child: aiState.modelLoaded
-                ? AgentChatView(
-                    key: _chatViewKey,
+            child: _isInitializing
+                ? const Center(child: CircularProgressIndicator())
+                : aiState.modelLoaded
+                    ? AgentChatView(
+                        key: _chatViewKey,
                     initialHistory: chatState.activeSession != null
                         ? chatController.getHistoryForLLM(chatState.activeSession!)
                         : null,
@@ -700,6 +708,16 @@ class _ModelPickerSheetState extends ConsumerState<_ModelPickerSheet> {
                               isSelected: isSelected,
                               isDownloaded: isDownloaded,
                               onTap: () => widget.onModelSelected(model.id),
+                              onDelete: () async {
+                                final confirmed = await showDeleteConfirmation(
+                                  context,
+                                  itemType: 'AI Model',
+                                  itemName: model.displayName,
+                                );
+                                if (confirmed == true) {
+                                  ref.read(aiRuntimeControllerProvider.notifier).deleteModel(model.id);
+                                }
+                              },
                             );
                           }
                           cursor += entry.value.length;
@@ -789,12 +807,14 @@ class _ModelTile extends StatelessWidget {
     required this.isSelected,
     required this.isDownloaded,
     required this.onTap,
+    required this.onDelete,
   });
 
   final AiModelInfo model;
   final bool isSelected;
   final bool isDownloaded;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -865,29 +885,45 @@ class _ModelTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 // Downloaded badge or size badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDownloaded ? Colors.green.withValues(alpha: 0.1) : cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isDownloaded) ...[
-                        const Icon(Icons.check_circle_outline, size: 12, color: Colors.green),
-                        const SizedBox(width: 4),
-                      ],
-                      Text(
-                        isDownloaded ? 'Ready' : model.sizeLabel,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: isDownloaded ? Colors.green : cs.onSurfaceVariant,
-                        ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDownloaded ? Colors.green.withValues(alpha: 0.1) : cs.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isDownloaded) ...[
+                            const Icon(Icons.check_circle_outline, size: 12, color: Colors.green),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            isDownloaded ? 'Ready' : model.sizeLabel,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isDownloaded ? Colors.green : cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isDownloaded) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        color: cs.error,
+                        tooltip: 'Delete Model',
+                        onPressed: onDelete,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                     ],
-                  ),
+                  ],
                 ),
               ],
             ),

@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme.dart';
+import '../../../models/vault_model.dart';
 import '../../../shared/widgets/confirm_delete_dialog.dart';
+import '../../events/screens/events_screen.dart';
 import '../../documents/screens/documents_screen.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../vault/controller/vault_controller.dart';
@@ -332,27 +334,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        onTap: () {
-                          if (result.type == 'Note') {
-                            final note = vault.notes
-                                .where((item) => item.id == result.id)
-                                .firstOrNull;
-                            if (note != null) {
-                              context.push('/notes/add', extra: note);
-                            }
-                          } else if (result.type == 'Document') {
-                            final document = vault.documents
-                                .where((item) => item.id == result.id)
-                                .firstOrNull;
-                            if (document != null) {
-                              DocumentsScreen.openDocument(context, document);
-                            }
-                          } else if (result.type == 'Password') {
-                            context.push('/passwords');
-                          } else if (result.type == 'Event') {
-                            context.push('/events');
-                          }
-                        },
+                        onTap: () => _openSearchResult(context, vault, result),
                         trailing: result.secret == null
                             ? null
                             : const Icon(Icons.lock_outline),
@@ -499,6 +481,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         );
       },
     );
+  }
+
+  Future<void> _openSearchResult(
+    BuildContext context,
+    VaultData vault,
+    SearchResult result,
+  ) async {
+    switch (result.type) {
+      case 'Note':
+        final note = vault.notes.where((item) => item.id == result.id).firstOrNull;
+        if (note != null) {
+          context.push('/notes/add', extra: note);
+        }
+        return;
+      case 'Document':
+        final document =
+            vault.documents.where((item) => item.id == result.id).firstOrNull;
+        if (document != null) {
+          DocumentsScreen.openDocument(context, document);
+        }
+        return;
+      case 'Event':
+        final event = vault.events.where((item) => item.id == result.id).firstOrNull;
+        if (event != null && context.mounted) {
+          await showDialog<VaultEvent>(
+            context: context,
+            builder: (context) => EventDialog(event: event),
+          );
+        }
+        return;
+      case 'Password':
+        context.push('/passwords');
+        return;
+    }
   }
 
   Widget _buildBottomInput(BuildContext context, ThemeData theme) {
