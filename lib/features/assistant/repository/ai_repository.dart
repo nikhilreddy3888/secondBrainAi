@@ -511,10 +511,34 @@ class AiRepository {
     List<AgentChatMessage> history = const [],
     String? sessionId,
   }) async* {
-    if (!_kitInitialized) await loadModel();
+    final stopwatch = Stopwatch()..start();
+    print('[AI] ========== START askStream ==========');
+    print('[AI] Question: "$question" (length: ${question.length})');
+    print('[AI] Mode: $mode, History length: ${history.length}, SessionId: $sessionId');
+    try {
+      // Ensure model is loaded
+      if (!_kitInitialized) {
+        print('[AI] Model not initialized, attempting to load...');
+        try {
+          await loadModel();
+          print('[AI] Model loaded successfully');
+        } catch (e) {
+          print('[AI] Failed to load model: $e');
+          yield "Error loading AI model: $e";
+          return;
+        }
+      }
 
-    if (!_kit.isReady) {
-      yield "The AI assistant is still starting up or failed to load. Please wait a moment or restart the app.";
+      // Verify model is ready
+      if (!_kit.isReady) {
+        print('[AI] Kit not ready, waiting or failed initialization');
+        yield "The AI assistant is still starting up or failed to load. Please wait a moment or restart the app.";
+        return;
+      }
+      print('[AI] Model ready, proceeding with inference');
+    } catch (e) {
+      print('[AI] Unexpected error during initialization: $e');
+      yield "Unexpected error during initialization: $e";
       return;
     }
 
@@ -523,170 +547,234 @@ class AiRepository {
     final responseBuffer = StringBuffer();
     // Unique marker to force context reset between different sessions
     final sessionMarker = sessionId != null ? 'Session Context ID: $sessionId\n' : '';
+    
+    // Limit tokens for very small models but allow enough for complete responses
+    final maxTokens = _selectedModel.parameterCount.contains('0.6B') ? 512 : 768;
+    print('[AI] Using max tokens: $maxTokens for model: ${_selectedModel.displayName}');
 
-    switch (mode) {
-      case AssistantMode.chat:
-        // Plain chat with session context — pass recent history so the LLM
-        // understands prior conversation turns.
-        final trimmedHistory = _getRecentHistory(history);
-        yield* _kit.askDirectStream(
-          question,
-          history: trimmedHistory,
-          systemPrompt:
-              '$sessionMarker'
-              'You are a personal, private AI assistant running locally on the user\'s device. '
-              'The user will share personal details (like their name) to help you assist them better. '
-              'You MUST remember and use this information from the conversation history. '
-              'If the user tells you their name, greet them by it and remember it for future questions. '
-              'Never say you don\'t have access to personal information—you have access to what the user tells you in this chat.',
-          maxTokens: 512,
-        ).transform(
-          _tapStream((token) => responseBuffer.write(token)),
-        );
-        break;
-
-      case AssistantMode.vault:
-        // RAG — vault context injected, no tools, with session history
-        final context = await _buildVaultContext();
-        final vault = await ref.read(vaultControllerProvider.future);
-        final trimmedHistory = _getRecentHistory(history);
-        final prompt =
-            'You are a helpful vault assistant. NEVER generate code.\n\n'
-            'VAULT DATA:\n$context\n\n'
-            'Question: $question\n\n'
-            'Answer briefly and directly:';
-        // Vault mode uses explicitly injected vault context and should not
-        // additionally query the RAG index.
-        yield* _kit.askDirectStream(
-          prompt,
-          history: trimmedHistory,
-          systemPrompt:
-              '$sessionMarker'
-              'You are a precise vault assistant. Use only the provided vault data. '
-              'If data is missing, say so clearly. '
-              'Remember everything the user tells you during this conversation.',
-          maxTokens: 512,
-        ).transform(
-          _tapStream((token) => responseBuffer.write(token)),
-        );
-        // After response streaming completes, extract vault sources and
-        // emit them as citations so the UI shows reference chips.
-        final responseText = responseBuffer.toString();
-        print('VaultQA: Response length = ${responseText.length}');
-        print('VaultQA: Question = "$question"');
-        print('VaultQA: Vault has ${vault.notes.length} notes, ${vault.passwords.length} passwords, ${vault.events.length} events, ${vault.documents.length} documents');
-        final vaultSources = _extractVaultSources(question, responseText, vault);
-        print('VaultQA: Extracted ${vaultSources.length} sources');
-        for (final s in vaultSources) {
-          print('VaultQA: Source → ${s.source.title}');
-        }
-        if (vaultSources.isNotEmpty) {
-          onCitations?.call(vaultSources);
-          print('VaultQA: onCitations called with ${vaultSources.length} sources');
-        } else {
-          print('VaultQA: No sources found to cite');
-        }
-        break;
-
-      case AssistantMode.agent:
-        // Agent — ReAct loop with tools + vault context
-        final context = await _buildVaultContext();
-        final beforeVault = await ref.read(vaultControllerProvider.future);
-        final expectedCreateTool = _expectedCreateToolForQuestion(question);
-        _toolTurnLimiter.beginTurn(
-          maxCreateActions: 1,
-          allowedCreateTools: expectedCreateTool == null
-              ? null
-              : {expectedCreateTool},
-        );
-        final toolRestriction = expectedCreateTool == null
-            ? ''
-            : '\n10. For this specific request, you MUST use only the tool "$expectedCreateTool" for any create action. Do not call other create_* tools.';
-        final systemPrompt =
-          'You are a private vault assistant.\n\n'
-          'VAULT DATA:\n$context\n\n'
-          'CRITICAL INSTRUCTIONS:\n'
-          '1. Agent mode is ONLY for tool calling. You MUST call a tool; never answer directly.\n'
-          '2. To perform ANY action, you MUST use the exact format:\n'
-          '   Thought: I need to [action]\n'
-          '   Action: [tool_name]\n'
-          '   Action Input: {"arg1": "value1"}\n'
-          '3. DO NOT use python function syntax like tool(args).\n'
-          '4. DO NOT use markdown code blocks like ```json.\n'
-          '5. NEVER say you have done something (e.g. "I created...") until you see an "Observation: Successfully created..." message.\n'
-          '6. If Observation contains "Failed" or any error text, explicitly tell the user the action was NOT completed.\n'
-          '7. Once you see the success Observation, use "Final Answer:" to tell the user it is done.\n'
-          '8. If you do not use the "Action:" format, no tool will be called and nothing will happen.\n'
-          '9. Never claim notes/passwords/events/documents were created without a success Observation containing an item id.\n'
-          '10. You are allowed to execute at most one create action for this request. After one successful creation, stop and provide Final Answer.'
-          '$toolRestriction';
-        try {
-          await for (final token in _kit.runAgent(
-            question,
-            systemPrompt: systemPrompt,
-          )) {
-            responseBuffer.write(token);
-            yield token;
+    try {
+      switch (mode) {
+        case AssistantMode.chat:
+          // Plain chat with session context — pass recent history so the LLM
+          // understands prior conversation turns.
+          print('[AI] Starting chat mode request');
+          final trimmedHistory = _getRecentHistory(history);
+          try {
+            // For very small models (like Qwen 0.6B), use an extremely concise system prompt
+            // Verbose prompts cause the model to output its reasoning instead of answers
+            final conciseSystemPrompt = _selectedModel.parameterCount.contains('0.6B')
+                ? 'You are a helpful assistant. Answer questions directly and concisely.'
+                : '$sessionMarker'
+                    'You are a personal, private AI assistant running locally on the user\'s device. '
+                    'The user will share personal details (like their name) to help you assist them better. '
+                    'You MUST remember and use this information from the conversation history. '
+                    'If the user tells you their name, greet them by it and remember it for future questions. '
+                    'Never say you don\'t have access to personal information—you have access to what the user tells you in this chat.';
+            
+            print('[AI] Calling askDirectStream for chat mode');
+            final inferenceStart = DateTime.now();
+            var tokenCount = 0;
+            await for (final token in _kit.askDirectStream(
+              question,
+              history: trimmedHistory,
+              systemPrompt: conciseSystemPrompt,
+              maxTokens: maxTokens,
+            )) {
+              tokenCount++;
+              responseBuffer.write(token);
+              yield token;
+            }
+            final inferenceTime = DateTime.now().difference(inferenceStart).inMilliseconds;
+            print('[AI] Chat mode inference completed in ${inferenceTime}ms (${tokenCount} tokens, ${(tokenCount*1000/inferenceTime).toStringAsFixed(0)} tokens/sec)');
+            print('[AI] Chat mode completed, response length: ${responseBuffer.length}');
+          } catch (e) {
+            print('[AI] Error in chat stream: $e');
+            final errorMsg = 'Error during chat: $e';
+            responseBuffer.write(errorMsg);
+            yield errorMsg;
           }
+          break;
 
-          final afterVault = await ref.read(vaultControllerProvider.future);
-          final verifiedSummary = _buildVerifiedCreationSummary(
-            beforeVault,
-            afterVault,
+        case AssistantMode.vault:
+          // RAG — vault context injected, no tools, with session history
+          print('[AI] Starting vault mode request');
+          final vaultStart = DateTime.now();
+          final context = await _buildVaultContext();
+          final vaultTime = DateTime.now().difference(vaultStart).inMilliseconds;
+          print('[AI] Vault context built in ${vaultTime}ms (length: ${context.length})');
+          final vault = await ref.read(vaultControllerProvider.future);
+          final trimmedHistory = _getRecentHistory(history);
+          final prompt =
+              'You are a helpful vault assistant. NEVER generate code.\n\n'
+              'VAULT DATA:\n$context\n\n'
+              'Question: $question\n\n'
+              'Answer briefly and directly:';
+          print('[AI] Vault prompt constructed (length: ${prompt.length})');
+          // Vault mode uses explicitly injected vault context and should not
+          // additionally query the RAG index.
+          try {
+            // For very small models, use concise system prompt
+            final conciseSystemPrompt = _selectedModel.parameterCount.contains('0.6B')
+                ? 'Answer using the vault data provided. Be brief.'
+                : '$sessionMarker'
+                    'You are a precise vault assistant. Use only the provided vault data. '
+                    'If data is missing, say so clearly. '
+                    'Remember everything the user tells you during this conversation.';
+            
+            print('[AI] Calling askDirectStream for vault mode');
+            await for (final token in _kit.askDirectStream(
+              prompt,
+              history: trimmedHistory,
+              systemPrompt: conciseSystemPrompt,
+              maxTokens: maxTokens,
+            )) {
+              responseBuffer.write(token);
+              yield token;
+            }
+            print('[AI] Vault mode completed, response length: ${responseBuffer.length}');
+          } catch (e) {
+            print('[AI] Error in vault stream: $e');
+            final errorMsg = 'Error during vault query: $e';
+            responseBuffer.write(errorMsg);
+            yield errorMsg;
+          }
+          // After response streaming completes, extract vault sources and
+          // emit them as citations so the UI shows reference chips.
+          final responseText = responseBuffer.toString();
+          print('VaultQA: Response length = ${responseText.length}');
+          print('VaultQA: Question = "$question"');
+          print('VaultQA: Vault has ${vault.notes.length} notes, ${vault.passwords.length} passwords, ${vault.events.length} events, ${vault.documents.length} documents');
+          final vaultSources = _extractVaultSources(question, responseText, vault);
+          print('VaultQA: Extracted ${vaultSources.length} sources');
+          for (final s in vaultSources) {
+            print('VaultQA: Source → ${s.source.title}');
+          }
+          if (vaultSources.isNotEmpty) {
+            onCitations?.call(vaultSources);
+            print('VaultQA: onCitations called with ${vaultSources.length} sources');
+          } else {
+            print('VaultQA: No sources found to cite');
+          }
+          break;
+
+        case AssistantMode.agent:
+          // Agent — ReAct loop with tools + vault context
+          print('[AI] Starting agent mode request');
+          final context = await _buildVaultContext();
+          final beforeVault = await ref.read(vaultControllerProvider.future);
+          final expectedCreateTool = _expectedCreateToolForQuestion(question);
+          _toolTurnLimiter.beginTurn(
+            maxCreateActions: 1,
+            allowedCreateTools: expectedCreateTool == null
+                ? null
+                : {expectedCreateTool},
           );
-          if (verifiedSummary != null) {
-            responseBuffer.write('\n\n$verifiedSummary');
-            yield '\n\n$verifiedSummary';
-          } else if (_looksLikeCreateIntent(question)) {
-            var previousVault = afterVault;
-            String? retrySummary;
+          final toolRestriction = expectedCreateTool == null
+              ? ''
+              : '\n10. For this specific request, you MUST use only the tool "$expectedCreateTool" for any create action. Do not call other create_* tools.';
+          
+          // For very small models, simplify system prompt dramatically
+          final isSmallModel = _selectedModel.parameterCount.contains('0.6B');
+          final systemPrompt = isSmallModel
+              ? 'You are a vault assistant. Use tools to create or modify items.\n\n'
+                  'VAULT DATA:\n$context'
+              : 'You are a private vault assistant.\n\n'
+                  'VAULT DATA:\n$context\n\n'
+                  'CRITICAL INSTRUCTIONS:\n'
+                  '1. Agent mode is ONLY for tool calling. You MUST call a tool; never answer directly.\n'
+                  '2. To perform ANY action, you MUST use the exact format:\n'
+                  '   Thought: I need to [action]\n'
+                  '   Action: [tool_name]\n'
+                  '   Action Input: {"arg1": "value1"}\n'
+                  '3. DO NOT use python function syntax like tool(args).\n'
+                  '4. DO NOT use markdown code blocks like ```json.\n'
+                  '5. NEVER say you have done something (e.g. "I created...") until you see an "Observation: Successfully created..." message.\n'
+                  '6. If Observation contains "Failed" or any error text, explicitly tell the user the action was NOT completed.\n'
+                  '7. Once you see the success Observation, use "Final Answer:" to tell the user it is done.\n'
+                  '8. If you do not use the "Action:" format, no tool will be called and nothing will happen.\n'
+                  '9. Never claim notes/passwords/events/documents were created without a success Observation containing an item id.\n'
+                  '10. You are allowed to execute at most one create action for this request. After one successful creation, stop and provide Final Answer.'
+                  '$toolRestriction';
+          try {
+            await for (final token in _kit.runAgent(
+              question,
+              systemPrompt: systemPrompt,
+            )) {
+              responseBuffer.write(token);
+              yield token;
+            }
+            print('[AI] Agent mode completed, response length: ${responseBuffer.length}');
 
-            for (
-              var attempt = 2;
-              attempt <= _maxAgentVerificationAttempts && retrySummary == null;
-              attempt++
-            ) {
-              yield '\n\nThinking...';
+            final afterVault = await ref.read(vaultControllerProvider.future);
+            final verifiedSummary = _buildVerifiedCreationSummary(
+              beforeVault,
+              afterVault,
+            );
+            if (verifiedSummary != null) {
+              responseBuffer.write('\n\n$verifiedSummary');
+              yield '\n\n$verifiedSummary';
+            } else if (_looksLikeCreateIntent(question)) {
+              var previousVault = afterVault;
+              String? retrySummary;
 
-              _toolTurnLimiter.beginTurn(
-                maxCreateActions: 1,
-                allowedCreateTools: expectedCreateTool == null
-                    ? null
-                    : {expectedCreateTool},
-              );
-              await for (final token in _kit.runAgent(
-                question,
-                systemPrompt: systemPrompt,
-              )) {
-                responseBuffer.write(token);
-                yield token;
+              for (
+                var attempt = 2;
+                attempt <= _maxAgentVerificationAttempts && retrySummary == null;
+                attempt++
+              ) {
+                yield '\n\nThinking...';
+
+                _toolTurnLimiter.beginTurn(
+                  maxCreateActions: 1,
+                  allowedCreateTools: expectedCreateTool == null
+                      ? null
+                      : {expectedCreateTool},
+                );
+                await for (final token in _kit.runAgent(
+                  question,
+                  systemPrompt: systemPrompt,
+                )) {
+                  responseBuffer.write(token);
+                  yield token;
+                }
+
+                final currentVault = await ref.read(
+                  vaultControllerProvider.future,
+                );
+                retrySummary = _buildVerifiedCreationSummary(
+                  previousVault,
+                  currentVault,
+                );
+                previousVault = currentVault;
               }
 
-              final currentVault = await ref.read(
-                vaultControllerProvider.future,
-              );
-              retrySummary = _buildVerifiedCreationSummary(
-                previousVault,
-                currentVault,
-              );
-              previousVault = currentVault;
+              if (retrySummary != null) {
+                responseBuffer.write('\n\n$retrySummary');
+                yield '\n\n$retrySummary';
+              } else {
+                const msg = '\n\nI could not verify a created item ID after '
+                    '$_maxAgentVerificationAttempts attempts. '
+                    'Please resend with explicit fields like title and content.';
+                responseBuffer.write(msg);
+                yield msg;
+              }
             }
-
-            if (retrySummary != null) {
-              responseBuffer.write('\n\n$retrySummary');
-              yield '\n\n$retrySummary';
-            } else {
-              const msg = '\n\nI could not verify a created item ID after '
-                  '$_maxAgentVerificationAttempts attempts. '
-                  'Please resend with explicit fields like title and content.';
-              responseBuffer.write(msg);
-              yield msg;
-            }
+          } catch (e) {
+            print('[AI] Error in agent stream: $e');
+            final errorMsg = 'Error during agent action: $e';
+            responseBuffer.write(errorMsg);
+            yield errorMsg;
+          } finally {
+            _toolTurnLimiter.endTurn();
           }
-        } finally {
-          _toolTurnLimiter.endTurn();
-        }
+          break;
+      }
+    } catch (e) {
+      print('[AI] Unexpected error in askStream: $e');
+      yield 'Unexpected error: $e';
     }
+    final totalTime = stopwatch.elapsedMilliseconds;
+    print('[AI] ========== END askStream (total: ${totalTime}ms), response length: ${responseBuffer.length} ==========');
   }
 
   bool get isModelLoaded => _kitInitialized;
