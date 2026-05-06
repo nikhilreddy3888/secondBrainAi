@@ -564,6 +564,15 @@ class _AgentChatViewState extends State<AgentChatView> {
     );
   }
 
+  /// Returns the icon matching a vault source type prefix in the title.
+  IconData _iconForSourceTitle(String title) {
+    if (title.contains('Note:')) return Icons.sticky_note_2_outlined;
+    if (title.contains('Password:')) return Icons.lock_outline;
+    if (title.contains('Event:')) return Icons.event_outlined;
+    if (title.contains('Document:')) return Icons.description_outlined;
+    return Icons.source_outlined;
+  }
+
   Widget _buildCitations(dynamic citations, ThemeData theme, Color accent) {
     if (citations is! List) return const SizedBox.shrink();
 
@@ -589,31 +598,71 @@ class _AgentChatViewState extends State<AgentChatView> {
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: citations.map((c) {
+          ...citations.map((c) {
+            // Handle both RetrievalResult objects (streaming) and JSON maps (persisted).
+            String title;
+            String content;
+            if (c is RetrievalResult) {
+              title = c.source.title;
+              content = c.content;
+            } else if (c is Map) {
               final source = c['source'];
-              final title =
-                  source is Map ? source['title'] ?? 'Source' : 'Source';
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: accent.withValues(alpha: 0.1)),
-                ),
-                child: Text(
-                  title as String,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: 11,
+              title = source is Map ? (source['title'] ?? 'Source') as String : 'Source';
+              content = (c['content'] as String?) ?? '';
+            } else {
+              title = 'Source';
+              content = '';
+            }
+            final icon = _iconForSourceTitle(title);
+
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 6),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: accent.withValues(alpha: 0.12)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 16, color: accent.withValues(alpha: 0.7)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (content.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            content.length > 100
+                                ? '${content.substring(0, 100)}\u2026'
+                                : content,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
-          ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
