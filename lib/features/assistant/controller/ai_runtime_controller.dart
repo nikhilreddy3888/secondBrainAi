@@ -76,10 +76,14 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
   Future<void> bootstrap() async {
     state = state.copyWith(status: 'Checking local AI model...', error: null);
     try {
+      print('[AI Runtime] Starting bootstrap');
       final repo = ref.read(aiRepositoryProvider);
       await repo.initialize();
+      print('[AI Runtime] Repository initialized');
       await refreshDownloadedModels();
+      print('[AI Runtime] Downloaded models refreshed: ${state.downloadedModels}');
       final selectedModelId = await _resolveStartupModelId();
+      print('[AI Runtime] Selected model ID: $selectedModelId');
       final changed = repo.selectModel(selectedModelId);
       if (changed || state.selectedModelId != selectedModelId) {
         state = state.copyWith(selectedModelId: selectedModelId);
@@ -87,6 +91,7 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       await _persistSelectedModelId(selectedModelId);
 
       final downloaded = await repo.isModelDownloaded();
+      print('[AI Runtime] Model downloaded: $downloaded');
 
       if (!downloaded) {
         state = state.copyWith(
@@ -95,6 +100,7 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
           modelLoaded: false,
           status: 'Download ${repo.modelName} to enable AI answers.',
         );
+        print('[AI Runtime] Model not downloaded, waiting for download');
         return;
       }
 
@@ -103,8 +109,10 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
         modelDownloaded: true,
         status: 'Loading local model...',
       );
+      print('[AI Runtime] Loading model...');
 
       await repo.loadModel();
+      print('[AI Runtime] Model loaded successfully');
       state = state.copyWith(
         initialized: true,
         modelDownloaded: true,
@@ -112,7 +120,9 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
         progress: 1,
         status: '${repo.modelName} loaded on device.',
       );
+      print('[AI Runtime] Bootstrap complete');
     } catch (error) {
+      print('[AI Runtime] Bootstrap error: $error');
       state = state.copyWith(
         initialized: true,
         modelDownloaded: false,
@@ -229,6 +239,7 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       error: null,
     );
     try {
+      print('[AI Runtime] Starting model download');
       await for (final progress in repo.downloadModel()) {
         state = state.copyWith(
           initialized: true,
@@ -240,8 +251,10 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
               : 'Downloading model ${(progress.percentage * 100).toStringAsFixed(0)}%',
         );
       }
+      print('[AI Runtime] Download complete, loading model');
       await repo.loadModel();
       await refreshDownloadedModels();
+      print('[AI Runtime] Model loaded successfully');
       state = state.copyWith(
         initialized: true,
         downloading: false,
@@ -251,6 +264,7 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
         status: '${repo.modelName} loaded on device.',
       );
     } catch (error) {
+      print('[AI Runtime] Error during download/load: $error');
       state = state.copyWith(
         initialized: true,
         downloading: false,
@@ -266,7 +280,9 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
     final repo = ref.read(aiRepositoryProvider);
     state = state.copyWith(status: 'Loading local model...', error: null);
     try {
+      print('[AI Runtime] Starting loadDownloadedModel');
       await repo.loadModel();
+      print('[AI Runtime] Model loaded successfully');
       state = state.copyWith(
         initialized: true,
         modelDownloaded: true,
@@ -275,6 +291,7 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
         status: '${repo.modelName} loaded on device.',
       );
     } catch (error) {
+      print('[AI Runtime] Error loading model: $error');
       state = state.copyWith(
         initialized: true,
         modelDownloaded: await repo.isModelDownloaded(),
