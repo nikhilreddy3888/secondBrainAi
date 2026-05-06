@@ -61,8 +61,6 @@ dependency_overrides:
     path: third_party/runanywhere_llamacpp
   flutter_local_agent_kit:
     path: third_party/flutter_local_agent_kit
-  rag_engine_flutter:
-    path: third_party/rag_engine_flutter
   record_android:
     path: third_party/record_android
 
