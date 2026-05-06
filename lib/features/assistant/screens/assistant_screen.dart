@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_local_agent_kit/flutter_local_agent_kit.dart';
@@ -279,9 +281,23 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                       );
 
                       final responseBuffer = StringBuffer();
-                      await for (final token in stream) {
-                        responseBuffer.write(token);
-                        yield token;
+                      try {
+                        await for (final token in stream.timeout(const Duration(seconds: 90))) {
+                          responseBuffer.write(token);
+                          yield token;
+                        }
+                      } on TimeoutException {
+                        const timeoutMessage =
+                            'I am taking longer than expected and did not complete this response. Please try again.';
+                        responseBuffer.write(timeoutMessage);
+                        yield timeoutMessage;
+                      }
+
+                      if (responseBuffer.toString().trim().isEmpty) {
+                        const emptyMessage =
+                            'I could not generate a response for that request. Please try rephrasing and send again.';
+                        responseBuffer.write(emptyMessage);
+                        yield emptyMessage;
                       }
 
                       await chatController.addAssistantMessage(

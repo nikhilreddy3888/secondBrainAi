@@ -293,7 +293,7 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       
       if (state.selectedModelId == modelId) {
         final fallbackModelId = await _resolveStartupModelId();
-        final changed = repo.selectModel(fallbackModelId);
+        repo.selectModel(fallbackModelId);
         await _persistSelectedModelId(fallbackModelId);
         state = state.copyWith(
           selectedModelId: fallbackModelId,

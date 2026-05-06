@@ -543,6 +543,7 @@ class AiRepository {
         ).transform(
           _tapStream((token) => responseBuffer.write(token)),
         );
+        break;
 
       case AssistantMode.vault:
         // RAG — vault context injected, no tools, with session history
@@ -585,6 +586,7 @@ class AiRepository {
         } else {
           print('VaultQA: No sources found to cite');
         }
+        break;
 
       case AssistantMode.agent:
         // Agent — ReAct loop with tools + vault context
