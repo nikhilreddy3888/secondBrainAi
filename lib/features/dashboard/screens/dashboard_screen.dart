@@ -505,10 +505,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       case 'Event':
         final event = vault.events.where((item) => item.id == result.id).firstOrNull;
         if (event != null && context.mounted) {
-          await showDialog<VaultEvent>(
+          final dialogResult = await showDialog<VaultEvent>(
             context: context,
             builder: (context) => EventDialog(event: event),
           );
+          if (dialogResult != null && dialogResult.title.isNotEmpty) {
+            await ref.read(vaultControllerProvider.notifier).upsertEvent(dialogResult);
+          }
         }
         return;
       case 'Password':
