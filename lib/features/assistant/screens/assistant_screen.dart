@@ -247,6 +247,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                         ? chatController.getHistoryForLLM(chatState.activeSession!)
                         : null,
                     onMessage: (content, {imageBytes, onCitations}) async* {
+                      final screenStopwatch = Stopwatch()..start();
+                      print('[Screen] ========== MESSAGE RECEIVED ==========');
+                      print('[Screen] Content: "$content" (length: ${content.length})');
+                      print('[Screen] ImageBytes: ${imageBytes != null}');
+                      
                       if (!_initialPromptProcessed) {
                         _initialPromptProcessed = true;
                       }
@@ -255,19 +260,24 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                       String? currentSessionId = ref.read(chatSessionControllerProvider).activeSessionId;
 
                       if (currentSessionId == null) {
+                        print('[Screen] No active session, creating new one');
                         final newSession = await chatController.createSession(
                           modelId: currentAiState.selectedModelId ?? AiModelRegistry.defaultModel.id,
                           mode: _mode.name,
                         );
                         currentSessionId = newSession.id;
+                        print('[Screen] Created session: $currentSessionId');
                       }
 
                       // Get history for the SPECIFIC session we are interacting with
                       // This now loads from DB if needed to ensure we never lose context.
                       final history = await chatController.getFullHistory(currentSessionId);
+                      print('[Screen] Loaded history: ${history.length} messages');
 
+                      print('[Screen] Saving user message to DB');
                       await chatController.addUserMessage(content, sessionId: currentSessionId);
 
+                      print('[Screen] Calling repository.askStream');
                       final stream = repository.askStream(
                         content,
                         mode: _mode,
@@ -281,16 +291,32 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                       );
 
                       final responseBuffer = StringBuffer();
+                      var hasReceivedTokens = false;
                       try {
-                        await for (final token in stream.timeout(const Duration(seconds: 90))) {
+                        print('[Screen] Starting to read stream');
+                        final streamTimeout = _mode == AssistantMode.chat
+                            ? const Duration(seconds: 120)
+                            : const Duration(seconds: 90);
+                        await for (final token in stream.timeout(streamTimeout)) {
+                          hasReceivedTokens = true;
                           responseBuffer.write(token);
                           yield token;
                         }
-                      } on TimeoutException {
-                        const timeoutMessage =
-                            'I am taking longer than expected and did not complete this response. Please try again.';
+                        print('[Screen] Stream completed successfully');
+                      } on TimeoutException catch (e) {
+                        print('[AI] Timeout error: Response generation took longer than the allowed stream timeout');
+                        final timeoutMessage = hasReceivedTokens
+                            ? '\n\n[Response truncated due to timeout]'
+                            : 'I am taking longer than expected and did not complete this response. Please try again.';
                         responseBuffer.write(timeoutMessage);
                         yield timeoutMessage;
+                      } catch (e) {
+                        print('[Screen] Stream error: $e');
+                        if (!hasReceivedTokens) {
+                          final errorMessage = 'Error generating response: $e';
+                          responseBuffer.write(errorMessage);
+                          yield errorMessage;
+                        }
                       }
 
                       if (responseBuffer.toString().trim().isEmpty) {
@@ -305,6 +331,8 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                         sessionId: currentSessionId,
                       );
                       await chatController.refreshSessions();
+                      final totalTime = screenStopwatch.elapsedMilliseconds;
+                      print('[Screen] ========== MESSAGE COMPLETE (total: ${totalTime}ms) ==========');
                     },
                     initialPromptToSend: _initialPromptProcessed ? null : widget.initialPrompt,
                     welcomeMessage: chatState.activeSessionId == null
