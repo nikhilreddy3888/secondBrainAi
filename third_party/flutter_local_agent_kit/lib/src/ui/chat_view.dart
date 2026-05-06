@@ -151,9 +151,14 @@ class _AgentChatViewState extends State<AgentChatView> {
 
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
+    print('[ChatView] ========== SEND MESSAGE ==========');
+    print('[ChatView] Text: "$text" (length: ${text.length})');
+    print('[ChatView] Processing: ${_isProcessing.value}');
+    
     if ((text.isEmpty && _selectedImageBytes == null) || _isProcessing.value)
       return;
 
+    print('[ChatView] Message validation passed, preparing to send');
     final imageToSend = _selectedImageBytes;
 
     setState(() {
@@ -169,6 +174,7 @@ class _AgentChatViewState extends State<AgentChatView> {
       _isProcessing.value = true;
     });
     _scrollToBottom();
+    print('[ChatView] User message added to UI');
 
     final assistantMessageId = _nextMessageId('assistant');
 
@@ -182,6 +188,8 @@ class _AgentChatViewState extends State<AgentChatView> {
 
     try {
       List<RetrievalResult> citations = [];
+      var hasReceivedTokens = false;
+      print('[ChatView] Calling onMessage handler');
       await for (final token in widget.onMessage(
         text,
         imageBytes: imageToSend,
@@ -190,13 +198,19 @@ class _AgentChatViewState extends State<AgentChatView> {
           _streamingCitations.value = results;
         },
       )) {
+        hasReceivedTokens = true;
         _streamingContent.value += token;
         _scrollToBottom();
       }
+      print('[ChatView] onMessage stream completed, tokens received: $hasReceivedTokens');
 
       final finalContent = _streamingContent.value;
       final index = _messages.indexWhere((m) => m.id == assistantMessageId);
       if (index != -1) {
+        // If no tokens received, show a warning message
+        if (!hasReceivedTokens) {
+          print('[ChatView] Warning: No tokens received from AI stream');
+        }
         setState(() {
           _messages[index] = AgentChatMessage.assistant(
             finalContent,
@@ -212,6 +226,7 @@ class _AgentChatViewState extends State<AgentChatView> {
         });
       }
     } catch (e) {
+      print('[ChatView] Exception in _sendMessage: $e');
       if (mounted) {
         final index = _messages.indexWhere((m) => m.id == assistantMessageId);
         if (index != -1) {
