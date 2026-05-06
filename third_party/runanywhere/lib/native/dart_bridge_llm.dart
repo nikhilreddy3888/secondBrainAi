@@ -489,7 +489,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     // Set systemPrompt if provided
     if (params.systemPrompt != null && params.systemPrompt!.isNotEmpty) {
       systemPromptPtr = params.systemPrompt!.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
     } else {
       optionsPtr.ref.systemPrompt = nullptr;
     }
@@ -557,7 +557,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     calloc.free(promptPtr);
     calloc.free(optionsPtr);
     if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr!);
+      calloc.free(systemPromptPtr);
     }
     _isolateSendPort = null;
   }
@@ -628,7 +628,7 @@ _IsolateGenerationResult _generateInIsolate(
     // Set systemPrompt if provided
     if (systemPrompt != null && systemPrompt.isNotEmpty) {
       systemPromptPtr = systemPrompt.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
     } else {
       optionsPtr.ref.systemPrompt = nullptr;
     }
@@ -664,7 +664,7 @@ _IsolateGenerationResult _generateInIsolate(
     calloc.free(optionsPtr);
     calloc.free(resultPtr);
     if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr!);
+      calloc.free(systemPromptPtr);
     }
   }
 }

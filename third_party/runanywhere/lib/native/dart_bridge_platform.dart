@@ -214,7 +214,7 @@ class DartBridgePlatform {
 // =============================================================================
 
 /// Logging callback - routes C++ logs to Dart logger
-/// 
+///
 /// NOTE: This callback is registered with NativeCallable.listener for thread safety.
 /// It runs asynchronously on the main isolate's event loop, which means by the time
 /// it executes, the C++ log message memory may have been freed. We handle this by
@@ -231,8 +231,9 @@ void _platformLogCallback(
     // Try to decode the message - may fail if memory was freed
     final msgString = message.toDartString();
     if (msgString.isEmpty) return;
-    
-    final categoryString = category != nullptr ? category.toDartString() : 'RAC';
+
+    final categoryString =
+        category != nullptr ? category.toDartString() : 'RAC';
 
     final logger = SDKLogger(categoryString);
 
@@ -546,8 +547,10 @@ int _platformHttpDownloadCallback(
     final taskId = 'http_${_httpDownloadCounter++}';
     outTaskId.value = taskId.toNativeUtf8();
 
-    final progressAddress = progressCallback == nullptr ? 0 : progressCallback.address;
-    final completeAddress = completeCallback == nullptr ? 0 : completeCallback.address;
+    final progressAddress =
+        progressCallback == nullptr ? 0 : progressCallback.address;
+    final completeAddress =
+        completeCallback == nullptr ? 0 : completeCallback.address;
     final userDataAddress = callbackUserData.address;
 
     unawaited(
@@ -666,8 +669,8 @@ Future<void> _performHttpDownloadIsolate(
 
     if (result != RacResultCode.success && tempFile != null) {
       try {
-        if (await tempFile!.exists()) {
-          await tempFile!.delete();
+        if (await tempFile.exists()) {
+          await tempFile.delete();
         }
       } catch (_) {
         // Ignore cleanup errors
@@ -676,7 +679,7 @@ Future<void> _performHttpDownloadIsolate(
 
     if (completeCallback != null) {
       if (finalPath != null) {
-        final pathPtr = finalPath!.toNativeUtf8();
+        final pathPtr = finalPath.toNativeUtf8();
         completeCallback(
           result,
           pathPtr,
