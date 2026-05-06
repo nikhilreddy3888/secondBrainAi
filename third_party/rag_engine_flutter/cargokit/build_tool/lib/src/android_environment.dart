@@ -33,6 +33,10 @@ class AndroidEnvironment {
           "cargo-ndk rustc linker: didn't find _CARGOKIT_NDK_LINK_TARGET env var");
     }
 
+    stderr.writeln('CARGOKIT LINKER WRAPPER: clang=$clang');
+    stderr.writeln('CARGOKIT LINKER WRAPPER: target=$target');
+    stderr.writeln('CARGOKIT LINKER WRAPPER: args=${args.join(" ")}');
+
     runCommand(clang, [
       target,
       ...args,
@@ -101,7 +105,8 @@ class AndroidEnvironment {
 
     final exe = Platform.isWindows ? '.exe' : '';
 
-    final arKey = 'AR_${target.rust}';
+    final rustTargetUnderscores = target.rust.replaceAll('-', '_');
+    final arKey = 'AR_$rustTargetUnderscores';
     final arValue = ['${target.rust}-ar', 'llvm-ar', 'llvm-ar.exe']
         .map((e) => path.join(toolchainPath, e))
         .firstWhereOrNull((element) => File(element).existsSync());
@@ -111,44 +116,37 @@ class AndroidEnvironment {
 
     final targetArg = '--target=${target.rust}$minSdkVersion';
 
-    final ccKey = 'CC_${target.rust}';
+    final ccKey = 'CC_$rustTargetUnderscores';
     final ccValue = path.join(toolchainPath, 'clang$exe');
-    final cfFlagsKey = 'CFLAGS_${target.rust}';
+    final cfFlagsKey = 'CFLAGS_$rustTargetUnderscores';
     final cFlagsValue = targetArg;
 
-    final cxxKey = 'CXX_${target.rust}';
+    final cxxKey = 'CXX_$rustTargetUnderscores';
     final cxxValue = path.join(toolchainPath, 'clang++$exe');
-    final cxxFlagsKey = 'CXXFLAGS_${target.rust}';
+    final cxxFlagsKey = 'CXXFLAGS_$rustTargetUnderscores';
     final cxxFlagsValue = targetArg;
 
     final linkerKey =
-        'cargo_target_${target.rust.replaceAll('-', '_')}_linker'.toUpperCase();
+        'cargo_target_$rustTargetUnderscores\_linker'.toUpperCase();
 
-    final ranlibKey = 'RANLIB_${target.rust}';
+    final ranlibKey = 'RANLIB_$rustTargetUnderscores';
     final ranlibValue = path.join(toolchainPath, 'llvm-ranlib$exe');
 
     final ndkVersionParsed = Version.parse(ndkVersion);
     final rustFlagsKey = 'CARGO_ENCODED_RUSTFLAGS';
     final rustFlagsValue = _libGccWorkaround(targetTempDir, ndkVersionParsed);
 
-    final runRustTool =
-        Platform.isWindows ? 'run_build_tool.cmd' : 'run_build_tool.sh';
-
-    final packagePath = (await Isolate.resolvePackageUri(
-            Uri.parse('package:build_tool/buildtool.dart')))!
-        .toFilePath();
-    final selfPath = path.canonicalize(path.join(
-      packagePath,
-      '..',
-      '..',
-      '..',
-      runRustTool,
-    ));
-
-    // Make sure that run_build_tool is working properly even initially launched directly
-    // through dart run.
-    final toolTempDir =
-        Platform.environment['CARGOKIT_TOOL_TEMP_DIR'] ?? targetTempDir;
+    // Create a small linker wrapper script that directly invokes NDK clang
+    // instead of going through the full Dart build_tool (which is fragile
+    // when re-entered as a linker subprocess).
+    final linkerWrapperDir = path.join(targetTempDir, 'cargokit', 'linker_wrapper');
+    Directory(linkerWrapperDir).createSync(recursive: true);
+    final linkerWrapperPath = path.join(linkerWrapperDir, 'linker_$rustTargetUnderscores.sh');
+    File(linkerWrapperPath).writeAsStringSync(
+      '#!/bin/sh\nexec "$ccValue" "$targetArg" "\$@"\n',
+    );
+    // Make it executable
+    Process.runSync('chmod', ['+x', linkerWrapperPath]);
 
     return {
       arKey: arValue,
@@ -158,11 +156,7 @@ class AndroidEnvironment {
       cxxFlagsKey: cxxFlagsValue,
       ranlibKey: ranlibValue,
       rustFlagsKey: rustFlagsValue,
-      linkerKey: selfPath,
-      // Recognized by main() so we know when we're acting as a wrapper
-      '_CARGOKIT_NDK_LINK_TARGET': targetArg,
-      '_CARGOKIT_NDK_LINK_CLANG': ccValue,
-      'CARGOKIT_TOOL_TEMP_DIR': toolTempDir,
+      linkerKey: linkerWrapperPath,
     };
   }
 

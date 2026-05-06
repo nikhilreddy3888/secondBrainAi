@@ -1,0 +1,11 @@
+/Users/mac/Desktop/second_brain/secondBrainAi/third_party/rag_engine_flutter/rust/target/aarch64-linux-android/release/deps/docx_lite-6422f208e9369565.d: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/error.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/types.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/parser.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/extractor.rs
+
+/Users/mac/Desktop/second_brain/secondBrainAi/third_party/rag_engine_flutter/rust/target/aarch64-linux-android/release/deps/libdocx_lite-6422f208e9369565.rlib: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/error.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/types.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/parser.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/extractor.rs
+
+/Users/mac/Desktop/second_brain/secondBrainAi/third_party/rag_engine_flutter/rust/target/aarch64-linux-android/release/deps/libdocx_lite-6422f208e9369565.rmeta: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/error.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/types.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/parser.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/extractor.rs
+
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/lib.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/error.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/types.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/parser.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/docx-lite-0.2.0/src/extractor.rs:

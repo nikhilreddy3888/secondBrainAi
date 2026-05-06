@@ -4,6 +4,10 @@ set -e
 
 BASEDIR=$(dirname "$0")
 
+echo "=== CARGOKIT DEBUG ==="
+printenv | grep CARGOKIT
+echo "======================"
+
 mkdir -p "$CARGOKIT_TOOL_TEMP_DIR"
 
 cd "$CARGOKIT_TOOL_TEMP_DIR"

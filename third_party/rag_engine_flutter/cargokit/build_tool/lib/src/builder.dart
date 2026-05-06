@@ -157,7 +157,11 @@ class RustBuilder {
         '--target-dir',
         environment.targetTempDir,
       ],
-      environment: await _buildEnvironment(),
+      environment: await () async {
+        final env = await _buildEnvironment();
+        _log.info('CARGOKIT BUILD ENV: $env');
+        return env;
+      }(),
     );
     return path.join(
       environment.targetTempDir,

@@ -1,0 +1,10 @@
+/Users/mac/Desktop/second_brain/secondBrainAi/third_party/rag_engine_flutter/rust/target/aarch64-linux-android/release/deps/potential_utf-e51a0feb56d90264.d: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/uchar.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/ustr.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/writeable.rs
+
+/Users/mac/Desktop/second_brain/secondBrainAi/third_party/rag_engine_flutter/rust/target/aarch64-linux-android/release/deps/libpotential_utf-e51a0feb56d90264.rlib: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/uchar.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/ustr.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/writeable.rs
+
+/Users/mac/Desktop/second_brain/secondBrainAi/third_party/rag_engine_flutter/rust/target/aarch64-linux-android/release/deps/libpotential_utf-e51a0feb56d90264.rmeta: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/uchar.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/ustr.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/writeable.rs
+
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/lib.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/uchar.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/ustr.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/potential_utf-0.1.4/src/writeable.rs:
