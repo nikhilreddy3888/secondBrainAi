@@ -85,56 +85,91 @@ class VaultRepository {
     );
   }
 
-  Future<void> save(VaultData vault) async {
+  Future<void> upsertNote(VaultNote note) async {
     await _ensureAuthenticated();
     final db = await _dbHelper.database;
+    await db.insert(
+      'notes',
+      {
+        'id': note.id,
+        'title': note.title,
+        'content': note.content,
+        'updated_at': note.updatedAt.toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
 
-    await db.transaction((txn) async {
-      // Clear existing records
-      await txn.delete('notes');
-      await txn.delete('documents');
-      await txn.delete('events');
-      await txn.delete('passwords');
+  Future<void> deleteNote(String id) async {
+    await _ensureAuthenticated();
+    final db = await _dbHelper.database;
+    await db.delete('notes', where: 'id = ?', whereArgs: [id]);
+  }
 
-      for (var note in vault.notes) {
-        await txn.insert('notes', {
-          'id': note.id,
-          'title': note.title,
-          'content': note.content,
-          'updated_at': note.updatedAt.toIso8601String(),
-        });
-      }
+  Future<void> upsertPassword(VaultPassword pw) async {
+    await _ensureAuthenticated();
+    final db = await _dbHelper.database;
+    await db.insert(
+      'passwords',
+      {
+        'id': pw.id,
+        'accountName': pw.accountName,
+        'username': pw.username,
+        'password': pw.password,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
 
-      for (var doc in vault.documents) {
-        await txn.insert('documents', {
-          'id': doc.id,
-          'title': doc.title,
-          'fileName': doc.fileName,
-          'path': doc.path,
-          'content': doc.content,
-          'addedAt': doc.addedAt.toIso8601String(),
-          'base64Data': doc.base64Data,
-        });
-      }
+  Future<void> deletePassword(String id) async {
+    await _ensureAuthenticated();
+    final db = await _dbHelper.database;
+    await db.delete('passwords', where: 'id = ?', whereArgs: [id]);
+  }
 
-      for (var event in vault.events) {
-        await txn.insert('events', {
-          'id': event.id,
-          'title': event.title,
-          'startsAt': event.startsAt.toIso8601String(),
-          'description': event.description,
-        });
-      }
+  Future<void> upsertDocument(VaultDocument doc) async {
+    await _ensureAuthenticated();
+    final db = await _dbHelper.database;
+    await db.insert(
+      'documents',
+      {
+        'id': doc.id,
+        'title': doc.title,
+        'fileName': doc.fileName,
+        'path': doc.path,
+        'content': doc.content,
+        'addedAt': doc.addedAt.toIso8601String(),
+        'base64Data': doc.base64Data,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
 
-      for (var pw in vault.passwords) {
-        await txn.insert('passwords', {
-          'id': pw.id,
-          'accountName': pw.accountName,
-          'username': pw.username,
-          'password': pw.password,
-        });
-      }
-    });
+  Future<void> deleteDocument(String id) async {
+    await _ensureAuthenticated();
+    final db = await _dbHelper.database;
+    await db.delete('documents', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> upsertEvent(VaultEvent event) async {
+    await _ensureAuthenticated();
+    final db = await _dbHelper.database;
+    await db.insert(
+      'events',
+      {
+        'id': event.id,
+        'title': event.title,
+        'startsAt': event.startsAt.toIso8601String(),
+        'description': event.description,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteEvent(String id) async {
+    await _ensureAuthenticated();
+    final db = await _dbHelper.database;
+    await db.delete('events', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> _migrateLegacyVault(Database db) async {
