@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.second_brain_app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     packaging {
         jniLibs {

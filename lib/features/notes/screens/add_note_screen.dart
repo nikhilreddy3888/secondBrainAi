@@ -61,6 +61,28 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     }
   }
 
+  void _insertText(String prefix, [String suffix = '']) {
+    final text = _contentController.text;
+    final selection = _contentController.selection;
+    
+    if (selection.start == -1) {
+      _contentController.text = text + prefix + suffix;
+      _contentController.selection = TextSelection.collapsed(offset: _contentController.text.length - suffix.length);
+      return;
+    }
+    
+    final selectedText = selection.textInside(text);
+    final newText = text.replaceRange(selection.start, selection.end, prefix + selectedText + suffix);
+    _contentController.text = newText;
+    _contentController.selection = TextSelection.collapsed(offset: selection.start + prefix.length + selectedText.length);
+  }
+
+  void _showDummyAction(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 1)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -74,6 +96,9 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     final cardBg = isDark ? const Color(0xFF241E2B).withOpacity(0.8) : Colors.white.withOpacity(0.6);
     final cardBorder = isDark ? Colors.white12 : Colors.white;
     final chipBg = isDark ? Colors.white12 : Colors.white.withOpacity(0.7);
+    final menuBg = isDark ? const Color(0xFF2C2533) : Colors.white;
+    final toolbarBg = isDark ? const Color(0xFF2C2533) : Colors.white;
+    final iconColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -106,7 +131,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                             child: Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                _buildEditorCard(primaryPurple, cardBg, cardBorder, textColor, hintColor),
+                                _buildEditorCard(primaryPurple, cardBg, cardBorder, textColor, hintColor, menuBg),
                                 Positioned(
                                   right: -15,
                                   bottom: -15,
@@ -234,7 +259,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildEditorCard(Color primaryPurple, Color cardBg, Color cardBorder, Color textColor, Color hintColor) {
+  Widget _buildEditorCard(Color primaryPurple, Color cardBg, Color cardBorder, Color textColor, Color hintColor, Color menuBg) {
     return Container(
       width: double.infinity,
       height: double.infinity,
