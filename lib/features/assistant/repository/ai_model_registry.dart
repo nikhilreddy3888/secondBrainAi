@@ -76,7 +76,7 @@ class AiModelRegistry {
           'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
       sizeLabel: '490 MB',
       templateType: 'chatml',
-      contextSize: 2048,
+      contextSize: 4096,
     ),
 
     AiModelInfo(

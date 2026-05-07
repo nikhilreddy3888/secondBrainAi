@@ -1,4 +1,3 @@
-import 'package:flutter_local_agent_kit/flutter_local_agent_kit.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/chat_session.dart';
@@ -48,8 +47,8 @@ class ChatSessionState {
 
 final chatSessionControllerProvider =
     NotifierProvider<ChatSessionController, ChatSessionState>(
-  ChatSessionController.new,
-);
+      ChatSessionController.new,
+    );
 
 class ChatSessionController extends Notifier<ChatSessionState> {
   @override
@@ -76,15 +75,9 @@ class ChatSessionController extends Notifier<ChatSessionState> {
     required String modelId,
     String mode = 'chat',
   }) async {
-    final session = await _repo.createSession(
-      modelId: modelId,
-      mode: mode,
-    );
+    final session = await _repo.createSession(modelId: modelId, mode: mode);
     final sessions = [session, ...state.sessions];
-    state = state.copyWith(
-      sessions: sessions,
-      activeSessionId: session.id,
-    );
+    state = state.copyWith(sessions: sessions, activeSessionId: session.id);
     return session;
   }
 
@@ -98,10 +91,7 @@ class ChatSessionController extends Notifier<ChatSessionState> {
       return s.id == sessionId ? session : s;
     }).toList();
 
-    state = state.copyWith(
-      sessions: sessions,
-      activeSessionId: sessionId,
-    );
+    state = state.copyWith(sessions: sessions, activeSessionId: sessionId);
     return session;
   }
 
@@ -110,16 +100,12 @@ class ChatSessionController extends Notifier<ChatSessionState> {
     final targetId = sessionId ?? state.activeSessionId;
     if (targetId == null) return;
 
-    await _repo.addMessage(
-      sessionId: targetId,
-      role: 'user',
-      content: content,
-    );
+    await _repo.addMessage(sessionId: targetId, role: 'user', content: content);
     // Auto-title on first user message
     final session = state.sessions.cast<ChatSession?>().firstWhere(
-          (s) => s?.id == targetId,
-          orElse: () => null,
-        );
+      (s) => s?.id == targetId,
+      orElse: () => null,
+    );
     if (session != null && session.title == 'New Chat') {
       await _repo.autoTitleSession(targetId);
     }
@@ -159,20 +145,17 @@ class ChatSessionController extends Notifier<ChatSessionState> {
     await _repo.deleteSession(sessionId);
     final sessions = state.sessions.where((s) => s.id != sessionId).toList();
     final clearActive = state.activeSessionId == sessionId;
-    state = state.copyWith(
-      sessions: sessions,
-      clearActiveSession: clearActive,
-    );
+    state = state.copyWith(sessions: sessions, clearActiveSession: clearActive);
   }
 
   /// Reload the session list (call after mutations).
   Future<void> refreshSessions() async {
     final newSessions = await _repo.getAllSessions();
     final activeSessionId = state.activeSessionId;
-    
+
     // Preserve the fully-loaded active session if it exists
     final activeSession = state.activeSession;
-    
+
     final sessions = newSessions.map((s) {
       if (s.id == activeSessionId && activeSession != null) {
         // Keep the fully loaded messages, just update metadata
@@ -184,28 +167,23 @@ class ChatSessionController extends Notifier<ChatSessionState> {
     state = state.copyWith(sessions: sessions);
   }
 
-  /// Convert persisted messages to AgentChatMessages for the LLM.
-  List<AgentChatMessage> getHistoryForLLM(ChatSession session) {
+  /// Convert persisted messages to plain chat message entries for the LLM.
+  List<ChatMessageEntry> getHistoryForLLM(ChatSession session) {
     return session.messages
         .where((m) => m.role == 'user' || m.role == 'assistant')
-        .map((m) {
-      return AgentChatMessage(
-        id: m.id,
-        content: m.content,
-        role: m.role == 'user' ? MessageRole.user : MessageRole.assistant,
-        timestamp: m.timestamp,
-      );
-    }).toList();
+        .toList();
   }
 
   /// Get full history for a specific session, loading from DB if needed.
-  Future<List<AgentChatMessage>> getFullHistory(String sessionId) async {
+  Future<List<ChatMessageEntry>> getFullHistory(String sessionId) async {
     // Check if it's already fully loaded in memory
     final active = state.activeSession;
-    if (active != null && active.id == sessionId && active.messages.length > 1) {
+    if (active != null &&
+        active.id == sessionId &&
+        active.messages.length > 1) {
       return getHistoryForLLM(active);
     }
-    
+
     // Otherwise load from DB
     final session = await _repo.getSession(sessionId);
     if (session == null) return [];

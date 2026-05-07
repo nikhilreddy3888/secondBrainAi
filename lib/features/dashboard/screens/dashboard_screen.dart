@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:local_auth/local_auth.dart';
 
 import '../../../core/theme.dart';
 import '../../../models/vault_model.dart';
@@ -19,9 +21,12 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  final LocalAuthentication _localAuth = LocalAuthentication();
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _aiController = TextEditingController();
   String _searchQuery = '';
+  bool _isAuthorized = false;
+  bool _isCheckingAuth = true;
 
   @override
   void initState() {
@@ -31,6 +36,57 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _searchQuery = _searchController.text;
       });
     });
+    
+    // Check for biometric lock on startup
+    Future.microtask(() => _checkBiometricLock());
+  }
+
+  Future<void> _checkBiometricLock() async {
+    // Wait a tiny bit to ensure SettingsController has a chance to start its _load
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    final settings = ref.read(settingsControllerProvider);
+    
+    // If settings haven't loaded yet (still default), we might need to wait 
+    // but the default is biometricEnabled = true, so it's safe.
+    
+    if (!settings.biometricEnabled) {
+      if (mounted) {
+        setState(() {
+          _isAuthorized = true;
+          _isCheckingAuth = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      final didAuthenticate = await _localAuth.authenticate(
+        localizedReason: 'Unlock your Second Brain',
+        options: const AuthenticationOptions(
+          stickyAuth: false, // Force a fresh prompt on app startup
+          biometricOnly: false,
+          useErrorDialogs: true,
+        ),
+      );
+      
+      if (mounted) {
+        setState(() {
+          _isAuthorized = didAuthenticate;
+          _isCheckingAuth = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Biometric auth error: $e');
+      if (mounted) {
+        setState(() {
+          // On error, stay locked but stop the loading spinner 
+          // so the user can see the "Unlock Now" button
+          _isAuthorized = false; 
+          _isCheckingAuth = false;
+        });
+      }
+    }
   }
 
   @override
@@ -43,6 +99,58 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    
+    if (_isCheckingAuth) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.psychology, size: 64, color: theme.colorScheme.primary),
+              const SizedBox(height: 24),
+              const CircularProgressIndicator(),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_isAuthorized) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.lock_outline_rounded, size: 48, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Second Brain is Locked',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text('Please authenticate to continue'),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: _checkBiometricLock,
+                icon: const Icon(Icons.fingerprint),
+                label: const Text('Unlock Now'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: _buildAppBar(context),

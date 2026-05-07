@@ -50,17 +50,12 @@ dependencies:
   runanywhere: 0.16.0
   runanywhere_llamacpp: ^0.16.0
   sqflite_sqlcipher: ^3.4.0
-  flutter_local_agent_kit: ^1.1.2
 
 dependency_overrides:
-  onnxruntime:
-    path: third_party/onnxruntime
   runanywhere:
     path: third_party/runanywhere
   runanywhere_llamacpp:
     path: third_party/runanywhere_llamacpp
-  flutter_local_agent_kit:
-    path: third_party/flutter_local_agent_kit
   record_android:
     path: third_party/record_android
 

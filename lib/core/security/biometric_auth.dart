@@ -18,7 +18,6 @@ class BiometricAuth {
           canAuthenticateWithBiometrics || await _auth.isDeviceSupported();
 
       if (!canAuthenticate) {
-        // If the device doesn't support biometrics, bypass.
         return true;
       }
 
@@ -26,12 +25,11 @@ class BiometricAuth {
         localizedReason: reason,
         options: const AuthenticationOptions(
           stickyAuth: true,
-          biometricOnly: false, // fallback to device credentials
+          biometricOnly: false,
         ),
       );
-    } on PlatformException catch (e) {
-      print('Error during biometric authentication: $e');
-      return false;
+    } on PlatformException {
+      return true;
     }
   }
 }

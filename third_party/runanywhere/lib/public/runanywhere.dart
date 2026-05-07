@@ -34,6 +34,7 @@ class RunAnywhere {
   static bool _isInitialized = false;
   static bool _hasRunDiscovery = false;
   static final List<ModelInfo> _registeredModels = [];
+  static final List<ModelInfo> _pendingRegistrySaves = [];
 
   // Note: LLM state is managed by DartBridgeLLM's native handle
   // Use DartBridge.llm.currentModelId and DartBridge.llm.isLoaded
@@ -290,6 +291,10 @@ class RunAnywhere {
     if (!_isInitialized) {
       throw SDKError.notInitialized();
     }
+
+    // Flush any pending C++ registry saves before discovery runs.
+    // This ensures models are in the registry before discovery.
+    await _flushPendingRegistrySaves();
 
     // Run discovery lazily on first call
     // This ensures models are already registered before discovery runs
@@ -1671,6 +1676,29 @@ class RunAnywhere {
     await DartBridgeModelRegistry.instance.removeModel(modelId);
   }
 
+  /// Flush any pending model registrations to the C++ registry.
+  /// This runs sequentially (not fire-and-forget) to prevent race conditions
+  /// with the LlamaCPP backend that can cause SIGSEGV crashes on Android.
+  static Future<void> _flushPendingRegistrySaves() async {
+    if (_pendingRegistrySaves.isEmpty) return;
+
+    final logger = SDKLogger('RunAnywhere.Models');
+    final pending = List<ModelInfo>.from(_pendingRegistrySaves);
+    _pendingRegistrySaves.clear();
+
+    for (final model in pending) {
+      try {
+        final success =
+            await DartBridgeModelRegistry.instance.savePublicModel(model);
+        if (!success) {
+          logger.warning('Failed to save model to C++ registry: ${model.id}');
+        }
+      } catch (e) {
+        logger.warning('Error saving model to C++ registry: $e');
+      }
+    }
+  }
+
   /// Internal: Run discovery once on first availableModels() call
   /// This ensures models are registered before discovery runs
   static Future<void> _runDiscovery() async {
@@ -1779,28 +1807,11 @@ class RunAnywhere {
 
     _registeredModels.add(model);
 
-    // Save to C++ registry (fire-and-forget, matches Swift pattern)
-    // This is critical for model discovery and loading to work correctly
-    _saveToCppRegistry(model);
+    // Defer C++ registry save to availableModels() which runs discovery.
+    // This avoids race conditions from fire-and-forget saves during startup.
+    _pendingRegistrySaves.add(model);
 
     return model;
-  }
-
-  /// Save model to C++ registry (fire-and-forget).
-  /// Matches Swift: `Task { try await CppBridge.ModelRegistry.shared.save(modelInfo) }`
-  static void _saveToCppRegistry(ModelInfo model) {
-    // Fire-and-forget save to C++ registry
-    unawaited(
-      DartBridgeModelRegistry.instance.savePublicModel(model).then((success) {
-        final logger = SDKLogger('RunAnywhere.Models');
-        if (!success) {
-          logger.warning('Failed to save model to C++ registry: ${model.id}');
-        }
-      }).catchError((Object error) {
-        SDKLogger('RunAnywhere.Models')
-            .error('Error saving model to C++ registry: $error');
-      }),
-    );
   }
 
   static ModelFormat _inferFormat(String path) {

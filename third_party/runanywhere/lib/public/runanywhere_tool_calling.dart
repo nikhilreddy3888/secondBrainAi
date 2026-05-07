@@ -198,6 +198,8 @@ extension RunAnywhereToolCalling on RunAnywhere {
       final genOptions = LLMGenerationOptions(
         maxTokens: opts.maxTokens ?? 1024,
         temperature: opts.temperature ?? 0.3,
+        systemPrompt: opts.systemPrompt,
+        streamingEnabled: true,
       );
 
       // Use streaming like Swift does, then collect all tokens

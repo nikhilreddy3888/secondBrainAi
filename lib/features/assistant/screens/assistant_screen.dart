@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_local_agent_kit/flutter_local_agent_kit.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/widgets/section_scaffold.dart';
 import '../../../shared/widgets/confirm_delete_dialog.dart';
+import '../models/chat_session.dart';
 import '../controller/ai_runtime_controller.dart';
 import '../controller/chat_session_controller.dart';
 import '../repository/ai_model_registry.dart';
@@ -89,262 +90,309 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
               ),
             )
           else ...[
-          // ── Model selector ──
-          _ModelSelectorTile(
-            selectedModelId: aiState.selectedModelId ?? AiModelRegistry.defaultModel.id,
-            isModelLoaded: aiState.modelLoaded,
-            onModelChanged: (modelId) {
-              aiController.selectModel(modelId);
-            },
-          ),
+            // ── Model selector ──
+            _ModelSelectorTile(
+              selectedModelId:
+                  aiState.selectedModelId ?? AiModelRegistry.defaultModel.id,
+              isModelLoaded: aiState.modelLoaded,
+              onModelChanged: (modelId) {
+                aiController.selectModel(modelId);
+              },
+            ),
 
-          // ── Download banner ──
-          if (!aiState.modelDownloaded) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Material(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.cloud_download_outlined, color: cs.primary),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              aiState.status,
-                              style: Theme.of(context).textTheme.bodySmall,
+            // ── Download banner ──
+            if (!aiState.modelDownloaded) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Material(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.cloud_download_outlined,
+                                color: cs.primary,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Model Download Required',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Text(
+                                    aiState.status,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: aiState.downloading
+                                  ? null
+                                  : aiController.downloadAndLoadModel,
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: const Text('Download'),
+                            ),
+                          ],
+                        ),
+                        if (aiState.downloading || aiState.progress > 0) ...[
+                          const SizedBox(height: 12),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              value: aiState.progress,
+                              minHeight: 8,
+                              backgroundColor: cs.primary.withValues(alpha: 0.1),
                             ),
                           ),
-                          FilledButton(
-                            onPressed: aiState.downloading
-                                ? null
-                                : aiController.downloadAndLoadModel,
-                            child: const Text('Download'),
+                        ],
+                        if (aiState.error != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            aiState.error!,
+                            style: TextStyle(color: cs.error, fontSize: 12),
                           ),
                         ],
-                      ),
-                      if (aiState.downloading || aiState.progress > 0) ...[
-                        const SizedBox(height: 10),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: LinearProgressIndicator(
-                            value: aiState.progress,
-                            minHeight: 6,
-                          ),
-                        ),
                       ],
-                      if (aiState.error != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          aiState.error!,
-                          style: TextStyle(color: cs.error, fontSize: 12),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-
-          if (aiState.modelDownloaded && !aiState.modelLoaded) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Material(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    children: [
-                      Icon(Icons.memory_outlined, color: cs.primary),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          aiState.status,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                      FilledButton(
-                        onPressed: aiController.loadDownloadedModel,
-                        child: const Text('Load'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-
-          // ── Mode selector + New chat button ──
-          if (aiState.modelLoaded)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SegmentedButton<AssistantMode>(
-                      style: ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        textStyle: WidgetStatePropertyAll(
-                          Theme.of(context).textTheme.labelSmall,
-                        ),
-                      ),
-                      segments: const [
-                        ButtonSegment(
-                          value: AssistantMode.chat,
-                          label: Text('Chat'),
-                          icon: Icon(Icons.chat_bubble_outline, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: AssistantMode.vault,
-                          label: Text('Vault Q&A'),
-                          icon: Icon(Icons.search, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: AssistantMode.agent,
-                          label: Text('Agent'),
-                          icon: Icon(Icons.build_outlined, size: 16),
-                        ),
-                      ],
-                      selected: {_mode},
-                      onSelectionChanged: (selection) {
-                        setState(() => _mode = selection.first);
-                      },
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton.outlined(
-                    tooltip: 'New chat',
-                    onPressed: () {
-                      chatController.startNewSession();
-                      setState(() {
-                        _chatViewKey = UniqueKey();
-                      });
-                    },
-                    icon: const Icon(Icons.add_comment_outlined, size: 20),
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+            ],
 
-          // ── Chat view ──
-          Expanded(
-            child: _isInitializing
-                ? const Center(child: CircularProgressIndicator())
-                : aiState.modelLoaded
-                    ? AgentChatView(
-                        key: _chatViewKey,
-                    initialHistory: chatState.activeSession != null
-                        ? chatController.getHistoryForLLM(chatState.activeSession!)
-                        : null,
-                    onMessage: (content, {imageBytes, onCitations}) async* {
-                      final screenStopwatch = Stopwatch()..start();
-                      print('[Screen] ========== MESSAGE RECEIVED ==========');
-                      print('[Screen] Content: "$content" (length: ${content.length})');
-                      print('[Screen] ImageBytes: ${imageBytes != null}');
-                      
-                      if (!_initialPromptProcessed) {
-                        _initialPromptProcessed = true;
-                      }
-
-                      final currentAiState = ref.read(aiRuntimeControllerProvider);
-                      String? currentSessionId = ref.read(chatSessionControllerProvider).activeSessionId;
-
-                      if (currentSessionId == null) {
-                        print('[Screen] No active session, creating new one');
-                        final newSession = await chatController.createSession(
-                          modelId: currentAiState.selectedModelId ?? AiModelRegistry.defaultModel.id,
-                          mode: _mode.name,
-                        );
-                        currentSessionId = newSession.id;
-                        print('[Screen] Created session: $currentSessionId');
-                      }
-
-                      // Get history for the SPECIFIC session we are interacting with
-                      // This now loads from DB if needed to ensure we never lose context.
-                      final history = await chatController.getFullHistory(currentSessionId);
-                      print('[Screen] Loaded history: ${history.length} messages');
-
-                      print('[Screen] Saving user message to DB');
-                      await chatController.addUserMessage(content, sessionId: currentSessionId);
-
-                      print('[Screen] Calling repository.askStream');
-                      final stream = repository.askStream(
-                        content,
-                        mode: _mode,
-                        history: history,
-                        sessionId: currentSessionId,
-                        onCitations: (results) {
-                          onCitations?.call(
-                            results.whereType<RetrievalResult>().toList(),
-                          );
-                        },
-                      );
-
-                      final responseBuffer = StringBuffer();
-                      var hasReceivedTokens = false;
-                      try {
-                        print('[Screen] Starting to read stream');
-                        final streamTimeout = _mode == AssistantMode.chat
-                            ? const Duration(seconds: 120)
-                            : const Duration(seconds: 90);
-                        await for (final token in stream.timeout(streamTimeout)) {
-                          hasReceivedTokens = true;
-                          responseBuffer.write(token);
-                          yield token;
-                        }
-                        print('[Screen] Stream completed successfully');
-                      } on TimeoutException catch (e) {
-                        print('[AI] Timeout error: Response generation took longer than the allowed stream timeout');
-                        final timeoutMessage = hasReceivedTokens
-                            ? '\n\n[Response truncated due to timeout]'
-                            : 'I am taking longer than expected and did not complete this response. Please try again.';
-                        responseBuffer.write(timeoutMessage);
-                        yield timeoutMessage;
-                      } catch (e) {
-                        print('[Screen] Stream error: $e');
-                        if (!hasReceivedTokens) {
-                          final errorMessage = 'Error generating response: $e';
-                          responseBuffer.write(errorMessage);
-                          yield errorMessage;
-                        }
-                      }
-
-                      if (responseBuffer.toString().trim().isEmpty) {
-                        const emptyMessage =
-                            'I could not generate a response for that request. Please try rephrasing and send again.';
-                        responseBuffer.write(emptyMessage);
-                        yield emptyMessage;
-                      }
-
-                      await chatController.addAssistantMessage(
-                        responseBuffer.toString(),
-                        sessionId: currentSessionId,
-                      );
-                      await chatController.refreshSessions();
-                      final totalTime = screenStopwatch.elapsedMilliseconds;
-                      print('[Screen] ========== MESSAGE COMPLETE (total: ${totalTime}ms) ==========');
-                    },
-                    initialPromptToSend: _initialPromptProcessed ? null : widget.initialPrompt,
-                    welcomeMessage: chatState.activeSessionId == null
-                        ? _welcomeForMode(_mode)
-                        : null,
-                    accentColor: cs.primary,
-                    enableImagePicker: false,
-                  )
-                : const Center(
-                    child: Text('Model not loaded. Please download or load the model.'),
+            if (aiState.modelDownloaded && !aiState.modelLoaded) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Material(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.memory_outlined, color: cs.primary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Model Ready',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                aiState.status,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: aiController.loadDownloadedModel,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text('Load'),
+                        ),
+                      ],
+                    ),
                   ),
-          ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            const SizedBox(height: 8),
+
+            // ── Mode selector ──
+            if (aiState.modelLoaded)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: _ModernModeSelector(
+                  currentMode: _mode,
+                  onModeChanged: (mode) => setState(() => _mode = mode),
+                ),
+              ),
+
+            const SizedBox(height: 12),
+
+            // ── Chat view ──
+            Expanded(
+              child: _isInitializing
+                  ? const Center(child: CircularProgressIndicator())
+                  : aiState.modelLoaded
+                  ? AgentChatView(
+                      key: _chatViewKey,
+                      initialHistory: chatState.activeSession != null
+                          ? chatController.getHistoryForLLM(
+                              chatState.activeSession!,
+                            )
+                          : null,
+                      onMessage: (content, {imageBytes, onCitations}) async* {
+                        final screenStopwatch = Stopwatch()..start();
+                        print(
+                          '[Screen] ========== MESSAGE RECEIVED ==========',
+                        );
+                        print(
+                          '[Screen] Content: "$content" (length: ${content.length})',
+                        );
+                        print('[Screen] ImageBytes: ${imageBytes != null}');
+
+                        if (!_initialPromptProcessed) {
+                          _initialPromptProcessed = true;
+                        }
+
+                        final currentAiState = ref.read(
+                          aiRuntimeControllerProvider,
+                        );
+                        String? currentSessionId = ref
+                            .read(chatSessionControllerProvider)
+                            .activeSessionId;
+
+                        if (currentSessionId == null) {
+                          print('[Screen] No active session, creating new one');
+                          final newSession = await chatController.createSession(
+                            modelId:
+                                currentAiState.selectedModelId ??
+                                AiModelRegistry.defaultModel.id,
+                            mode: _mode.name,
+                          );
+                          currentSessionId = newSession.id;
+                          print('[Screen] Created session: $currentSessionId');
+                        }
+
+                        // Get history for the SPECIFIC session we are interacting with
+                        // This now loads from DB if needed to ensure we never lose context.
+                        final history = await chatController.getFullHistory(
+                          currentSessionId,
+                        );
+                        print(
+                          '[Screen] Loaded history: ${history.length} messages',
+                        );
+
+                        print('[Screen] Saving user message to DB');
+                        await chatController.addUserMessage(
+                          content,
+                          sessionId: currentSessionId,
+                        );
+
+                        print('[Screen] Calling repository.askStream');
+                        final stream = repository.askStream(
+                          content,
+                          mode: _mode,
+                          history: history,
+                          sessionId: currentSessionId,
+                          onCitations: (results) {
+                            onCitations?.call(const []);
+                          },
+                        );
+
+                        final responseBuffer = StringBuffer();
+                        var hasReceivedTokens = false;
+                        try {
+                          print('[Screen] Starting to read stream');
+                          final streamTimeout = _mode == AssistantMode.chat
+                              ? const Duration(seconds: 120)
+                              : const Duration(seconds: 90);
+                          await for (final token in stream.timeout(
+                            streamTimeout,
+                          )) {
+                            hasReceivedTokens = true;
+                            responseBuffer.write(token);
+                            yield token;
+                          }
+                          print('[Screen] Stream completed successfully');
+                        } on TimeoutException {
+                          print(
+                            '[AI] Timeout error: Response generation took longer than the allowed stream timeout',
+                          );
+                          final timeoutMessage = hasReceivedTokens
+                              ? '\n\n[Response truncated due to timeout]'
+                              : 'I am taking longer than expected and did not complete this response. Please try again.';
+                          responseBuffer.write(timeoutMessage);
+                          yield timeoutMessage;
+                        } catch (e) {
+                          print('[Screen] Stream error: $e');
+                          if (!hasReceivedTokens) {
+                            final errorMessage =
+                                'Error generating response: $e';
+                            responseBuffer.write(errorMessage);
+                            yield errorMessage;
+                          }
+                        }
+
+                        if (responseBuffer.toString().trim().isEmpty) {
+                          const emptyMessage =
+                              'I could not generate a response for that request. Please try rephrasing and send again.';
+                          responseBuffer.write(emptyMessage);
+                          yield emptyMessage;
+                        }
+
+                        await chatController.addAssistantMessage(
+                          responseBuffer.toString(),
+                          sessionId: currentSessionId,
+                        );
+                        await chatController.refreshSessions();
+                        final totalTime = screenStopwatch.elapsedMilliseconds;
+                        print(
+                          '[Screen] ========== MESSAGE COMPLETE (total: ${totalTime}ms) ==========',
+                        );
+                      },
+                      initialPromptToSend: _initialPromptProcessed
+                          ? null
+                          : widget.initialPrompt,
+                      welcomeMessage: chatState.activeSessionId == null
+                          ? _welcomeForMode(_mode)
+                          : null,
+                      accentColor: cs.primary,
+                      enableImagePicker: false,
+                    )
+                  : const Center(
+                      child: Text(
+                        'Model not loaded. Please download or load the model.',
+                      ),
+                    ),
+            ),
           ],
         ],
       ),
@@ -432,17 +480,22 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                           itemCount: sessions.length,
                           itemBuilder: (context, index) {
                             final session = sessions[index];
-                            final isSelected = session.id == state.activeSessionId;
-                            
+                            final isSelected =
+                                session.id == state.activeSessionId;
+
                             return ListTile(
                               selected: isSelected,
-                              selectedTileColor: cs.primaryContainer.withValues(alpha: 0.3),
+                              selectedTileColor: cs.primaryContainer.withValues(
+                                alpha: 0.3,
+                              ),
                               title: Text(
                                 session.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               ),
                               subtitle: Text(
@@ -452,16 +505,21 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                                 style: TextStyle(fontSize: 12),
                               ),
                               trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                ),
                                 onPressed: () async {
-                                  final confirmed = await showDeleteConfirmation(
-                                    context,
-                                    itemType: 'Chat Session',
-                                    itemName: session.title,
-                                  );
+                                  final confirmed =
+                                      await showDeleteConfirmation(
+                                        context,
+                                        itemType: 'Chat Session',
+                                        itemName: session.title,
+                                      );
                                   if (confirmed == true) {
                                     await controller.deleteSession(session.id);
-                                    if (context.mounted && sessions.length <= 1) {
+                                    if (context.mounted &&
+                                        sessions.length <= 1) {
                                       Navigator.pop(context);
                                     }
                                   }
@@ -570,7 +628,11 @@ class _ModelSelectorTile extends StatelessWidget {
               _StatusBadge(label: 'Active', color: Colors.green),
               const SizedBox(width: 4),
             ],
-            Icon(Icons.unfold_more_rounded, size: 20, color: cs.onSurfaceVariant),
+            Icon(
+              Icons.unfold_more_rounded,
+              size: 20,
+              color: cs.onSurfaceVariant,
+            ),
           ],
         ),
       ),
@@ -629,11 +691,15 @@ class _ModelPickerSheetState extends ConsumerState<_ModelPickerSheet> {
 
   /// Groups filtered models by family, preserving insertion order.
   /// Downloaded models are extracted and placed at the very top.
-  Map<String, List<AiModelInfo>> _getGroupedModels(Set<String> downloadedModels) {
+  Map<String, List<AiModelInfo>> _getGroupedModels(
+    Set<String> downloadedModels,
+  ) {
     final groups = <String, List<AiModelInfo>>{};
-    
+
     // Special group for already downloaded models
-    final downloaded = _filteredModels.where((m) => downloadedModels.contains(m.id)).toList();
+    final downloaded = _filteredModels
+        .where((m) => downloadedModels.contains(m.id))
+        .toList();
     if (downloaded.isNotEmpty) {
       groups['Downloaded'] = downloaded;
     }
@@ -649,7 +715,9 @@ class _ModelPickerSheetState extends ConsumerState<_ModelPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final downloadedModels = ref.watch(aiRuntimeControllerProvider).downloadedModels;
+    final downloadedModels = ref
+        .watch(aiRuntimeControllerProvider)
+        .downloadedModels;
     final groups = _getGroupedModels(downloadedModels);
 
     return DraggableScrollableSheet(
@@ -702,14 +770,21 @@ class _ModelPickerSheetState extends ConsumerState<_ModelPickerSheet> {
                   hintText: 'Search models…',
                   prefixIcon: const Icon(Icons.search, size: 20),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.3)),
+                    borderSide: BorderSide(
+                      color: cs.outline.withValues(alpha: 0.3),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.3)),
+                    borderSide: BorderSide(
+                      color: cs.outline.withValues(alpha: 0.3),
+                    ),
                   ),
                 ),
                 onChanged: (v) => setState(() => _search = v),
@@ -728,8 +803,10 @@ class _ModelPickerSheetState extends ConsumerState<_ModelPickerSheet> {
                   : ListView.builder(
                       controller: scrollController,
                       padding: const EdgeInsets.only(bottom: 24),
-                      itemCount: groups.entries
-                          .fold<int>(0, (sum, e) => sum + 1 + e.value.length),
+                      itemCount: groups.entries.fold<int>(
+                        0,
+                        (sum, e) => sum + 1 + e.value.length,
+                      ),
                       itemBuilder: (context, index) {
                         // Flatten groups into a single list with headers
                         var cursor = 0;
@@ -745,8 +822,11 @@ class _ModelPickerSheetState extends ConsumerState<_ModelPickerSheet> {
                           final modelIndex = index - cursor;
                           if (modelIndex < entry.value.length) {
                             final model = entry.value[modelIndex];
-                            final isSelected = model.id == widget.selectedModelId;
-                            final isDownloaded = downloadedModels.contains(model.id);
+                            final isSelected =
+                                model.id == widget.selectedModelId;
+                            final isDownloaded = downloadedModels.contains(
+                              model.id,
+                            );
                             return _ModelTile(
                               model: model,
                               isSelected: isSelected,
@@ -759,7 +839,11 @@ class _ModelPickerSheetState extends ConsumerState<_ModelPickerSheet> {
                                   itemName: model.displayName,
                                 );
                                 if (confirmed == true) {
-                                  ref.read(aiRuntimeControllerProvider.notifier).deleteModel(model.id);
+                                  ref
+                                      .read(
+                                        aiRuntimeControllerProvider.notifier,
+                                      )
+                                      .deleteModel(model.id);
                                 }
                               },
                             );
@@ -836,9 +920,7 @@ class _FamilyHeader extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: Divider(color: cs.outline.withValues(alpha: 0.3)),
-          ),
+          Expanded(child: Divider(color: cs.outline.withValues(alpha: 0.3))),
         ],
       ),
     );
@@ -887,9 +969,7 @@ class _ModelTile extends StatelessWidget {
                       color: isSelected ? cs.primary : cs.outline,
                       width: isSelected ? 2 : 1.5,
                     ),
-                    color: isSelected
-                        ? cs.primary
-                        : Colors.transparent,
+                    color: isSelected ? cs.primary : Colors.transparent,
                   ),
                   child: isSelected
                       ? const Icon(Icons.check, size: 14, color: Colors.white)
@@ -908,7 +988,9 @@ class _ModelTile extends StatelessWidget {
                               model.displayName,
                               style: GoogleFonts.inter(
                                 fontSize: 14,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                                 color: isSelected ? cs.primary : cs.onSurface,
                               ),
                             ),
@@ -922,7 +1004,10 @@ class _ModelTile extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         model.description,
-                        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -933,16 +1018,25 @@ class _ModelTile extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: isDownloaded ? Colors.green.withValues(alpha: 0.1) : cs.surfaceContainerHighest,
+                        color: isDownloaded
+                            ? Colors.green.withValues(alpha: 0.1)
+                            : cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (isDownloaded) ...[
-                            const Icon(Icons.check_circle_outline, size: 12, color: Colors.green),
+                            const Icon(
+                              Icons.check_circle_outline,
+                              size: 12,
+                              color: Colors.green,
+                            ),
                             const SizedBox(width: 4),
                           ],
                           Text(
@@ -950,7 +1044,9 @@ class _ModelTile extends StatelessWidget {
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: isDownloaded ? Colors.green : cs.onSurfaceVariant,
+                              color: isDownloaded
+                                  ? Colors.green
+                                  : cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -1023,10 +1119,7 @@ class _StatusBadge extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 4),
           Text(
@@ -1038,6 +1131,491 @@ class _StatusBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class AgentChatView extends StatefulWidget {
+  const AgentChatView({
+    super.key,
+    this.initialHistory,
+    required this.onMessage,
+    this.initialPromptToSend,
+    this.welcomeMessage,
+    this.accentColor,
+    this.enableImagePicker = false,
+  });
+
+  final List<ChatMessageEntry>? initialHistory;
+  final Stream<String> Function(
+    String content, {
+    Uint8List? imageBytes,
+    void Function(List<dynamic>)? onCitations,
+  })
+  onMessage;
+  final String? initialPromptToSend;
+  final String? welcomeMessage;
+  final Color? accentColor;
+  final bool enableImagePicker;
+
+  @override
+  State<AgentChatView> createState() => _AgentChatViewState();
+}
+
+class _AgentChatViewState extends State<AgentChatView> {
+  final TextEditingController _inputController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final List<_ChatBubble> _messages = [];
+  bool _isSending = false;
+  bool _sentInitialPrompt = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncHistory(widget.initialHistory);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeSendInitialPrompt();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant AgentChatView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialHistory != widget.initialHistory) {
+      _syncHistory(widget.initialHistory);
+      _sentInitialPrompt = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeSendInitialPrompt();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _inputController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _syncHistory(List<ChatMessageEntry>? history) {
+    _messages
+      ..clear()
+      ..addAll(
+        (history ?? const []).map((entry) {
+          return _ChatBubble(role: entry.role, content: entry.content);
+        }),
+      );
+  }
+
+  void _maybeSendInitialPrompt() {
+    if (_sentInitialPrompt || widget.initialPromptToSend == null) return;
+    if (_messages.isNotEmpty) return;
+    _sentInitialPrompt = true;
+    _inputController.text = widget.initialPromptToSend!;
+    _submitMessage();
+  }
+
+  Future<void> _submitMessage() async {
+    if (_isSending) return;
+    final message = _inputController.text.trim();
+    if (message.isEmpty) return;
+
+    setState(() {
+      _messages.add(_ChatBubble(role: 'user', content: message));
+      _inputController.clear();
+      _isSending = true;
+    });
+    _scrollToBottom();
+
+    final assistantBuffer = StringBuffer();
+    try {
+      await for (final token in widget.onMessage(message)) {
+        assistantBuffer.write(token);
+        if (_messages.isNotEmpty && _messages.last.role == 'assistant-stream') {
+          _messages.removeLast();
+        }
+        setState(() {
+          _messages.add(
+            _ChatBubble(
+              role: 'assistant-stream',
+              content: assistantBuffer.toString(),
+            ),
+          );
+        });
+        _scrollToBottom();
+      }
+    } finally {
+      if (_messages.isNotEmpty && _messages.last.role == 'assistant-stream') {
+        final finalText = _messages.last.content.trim();
+        _messages.removeLast();
+        if (finalText.isNotEmpty) {
+          _messages.add(_ChatBubble(role: 'assistant', content: finalText));
+        }
+      }
+      if (assistantBuffer.isEmpty) {
+        _messages.add(
+          const _ChatBubble(
+            role: 'assistant',
+            content: 'I could not generate a response for that request.',
+          ),
+        );
+      }
+      setState(() {
+        _isSending = false;
+      });
+      _scrollToBottom();
+    }
+  }
+
+  void _scrollToBottom() {
+    if (!_scrollController.hasClients) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = widget.accentColor ?? cs.primary;
+
+    return Column(
+      children: [
+        Expanded(
+          child: _messages.isEmpty
+              ? _WelcomePanel(
+                  message: widget.welcomeMessage ?? 'Start a conversation.',
+                  accentColor: accent,
+                )
+              : ListView.separated(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                  itemCount: _messages.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final message = _messages[index];
+                    return _ChatBubbleTile(
+                      message: message,
+                      accentColor: accent,
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: cs.surface.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.shadow.withValues(alpha: 0.08),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+              border: Border.all(
+                color: cs.outline.withValues(alpha: 0.1),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _inputController,
+                        minLines: 1,
+                        maxLines: 5,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _submitMessage(),
+                        style: GoogleFonts.inter(fontSize: 15),
+                        decoration: InputDecoration(
+                          hintText: 'Ask anything...',
+                          hintStyle: TextStyle(
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                            fontSize: 15,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _AnimatedSendButton(
+                      isSending: _isSending,
+                      onPressed: _submitMessage,
+                      accentColor: accent,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnimatedSendButton extends StatelessWidget {
+  const _AnimatedSendButton({
+    required this.isSending,
+    required this.onPressed,
+    required this.accentColor,
+  });
+
+  final bool isSending;
+  final VoidCallback onPressed;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: Material(
+        color: isSending ? accentColor.withValues(alpha: 0.2) : accentColor,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: isSending ? null : onPressed,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: isSending
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                    ),
+                  )
+                : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatBubble {
+  const _ChatBubble({required this.role, required this.content});
+
+  final String role;
+  final String content;
+}
+
+class _ChatBubbleTile extends StatelessWidget {
+  const _ChatBubbleTile({required this.message, required this.accentColor});
+
+  final _ChatBubble message;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isUser = message.role == 'user';
+    final isStreaming = message.role == 'assistant-stream';
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        constraints: const BoxConstraints(maxWidth: 300),
+        margin: EdgeInsets.only(
+          left: isUser ? 50 : 0,
+          right: isUser ? 0 : 50,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: isUser
+              ? LinearGradient(
+                  colors: [accentColor, accentColor.withValues(alpha: 0.8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : LinearGradient(
+                  colors: [
+                    cs.surfaceContainerHighest,
+                    cs.surfaceContainerHighest.withValues(alpha: 0.7),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: Radius.circular(isUser ? 20 : 4),
+            bottomRight: Radius.circular(isUser ? 4 : 20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (isUser ? accentColor : cs.shadow).withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Text(
+          message.content.isEmpty && isStreaming
+              ? 'Generating...'
+              : message.content,
+          style: GoogleFonts.inter(
+            color: isUser ? Colors.white : cs.onSurface,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            height: 1.4,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModernModeSelector extends StatelessWidget {
+  const _ModernModeSelector({
+    required this.currentMode,
+    required this.onModeChanged,
+  });
+
+  final AssistantMode currentMode;
+  final ValueChanged<AssistantMode> onModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          _ModeItem(
+            label: 'Chat',
+            icon: Icons.chat_bubble_outline_rounded,
+            isSelected: currentMode == AssistantMode.chat,
+            onTap: () => onModeChanged(AssistantMode.chat),
+          ),
+          _ModeItem(
+            label: 'Vault',
+            icon: Icons.search_rounded,
+            isSelected: currentMode == AssistantMode.vault,
+            onTap: () => onModeChanged(AssistantMode.vault),
+          ),
+          _ModeItem(
+            label: 'Agent',
+            icon: Icons.auto_fix_high_rounded,
+            isSelected: currentMode == AssistantMode.agent,
+            onTap: () => onModeChanged(AssistantMode.agent),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeItem extends StatelessWidget {
+  const _ModeItem({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? cs.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: cs.shadow.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? cs.primary : cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WelcomePanel extends StatelessWidget {
+  const _WelcomePanel({required this.message, required this.accentColor});
+
+  final String message;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                accentColor.withValues(alpha: 0.12),
+                cs.surfaceContainerHighest,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: accentColor.withValues(alpha: 0.18)),
+          ),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
       ),
     );
   }

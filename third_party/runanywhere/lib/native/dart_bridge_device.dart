@@ -540,27 +540,15 @@ void _performHttpPost(
   }
 
   // Schedule async HTTP call (fire and forget for now)
-  // The C++ layer will retry if needed
+  // The C++ layer will retry if needed.
+  // WARNING: We cannot write to outResponse asynchronously because the pointer
+  // is freed by C++ as soon as this function returns synchronously.
   unawaited(Future.microtask(() async {
     try {
-      final response = await http.post(url, headers: headers, body: body);
-
-      outResponse.ref.result =
-          response.statusCode >= 200 && response.statusCode < 300
-              ? RacResultCode.success
-              : RacResultCode.errorNetworkError;
-      outResponse.ref.statusCode = response.statusCode;
-
-      if (response.body.isNotEmpty) {
-        final bodyPtr = response.body.toNativeUtf8();
-        outResponse.ref.responseBody = bodyPtr;
-      }
+      await http.post(url, headers: headers, body: body);
+      // We purposefully drop the response to avoid SIGSEGV from use-after-free.
     } catch (e) {
-      outResponse.ref.result = RacResultCode.errorNetworkError;
-      outResponse.ref.statusCode = 0;
-
-      final errorPtr = e.toString().toNativeUtf8();
-      outResponse.ref.errorMessage = errorPtr;
+      SDKLogger('DartBridge.Device').error('HTTP POST failed: $e');
     }
   }));
 

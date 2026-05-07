@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart';
@@ -12,44 +13,44 @@ final databaseHelperProvider = Provider<DatabaseHelper>((ref) {
 class DatabaseHelper {
   final KeyManager _keyManager;
   Database? _database;
+  Future<Database>? _initFuture;
 
   DatabaseHelper(this._keyManager);
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    return await (_initFuture ??= _initDatabase());
   }
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'second_brain_vault.db');
 
-    // Retrieve the master key to unlock SQLCipher
     final password = await _keyManager.getOrCreateMasterKey();
 
     try {
-      return await openDatabase(
+      _database = await openDatabase(
         path,
         version: 2,
         password: password,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
+        singleInstance: true,
       );
+      return _database!;
     } catch (e) {
-      // If the database file exists but can't be opened (e.g. old unencrypted
-      // database incompatible with SQLCipher), delete it and create fresh.
-      final dbFile = File(path);
-      if (await dbFile.exists()) {
-        await dbFile.delete();
+      if (await databaseExists(path)) {
+        await deleteDatabase(path);
       }
-      return await openDatabase(
+      _database = await openDatabase(
         path,
         version: 2,
         password: password,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
+        singleInstance: true,
       );
+      return _database!;
     }
   }
 

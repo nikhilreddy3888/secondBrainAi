@@ -82,6 +82,7 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       final repo = ref.read(aiRepositoryProvider);
       await repo.initialize();
       print('[AI Runtime] Repository initialized');
+      await repo.ensureModelsRegistered();
       await refreshDownloadedModels();
       print('[AI Runtime] Downloaded models refreshed: ${state.downloadedModels}');
       final selectedModelId = await _resolveStartupModelId();
@@ -90,8 +91,7 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       if (changed || state.selectedModelId != selectedModelId) {
         state = state.copyWith(selectedModelId: selectedModelId);
       }
-      await _persistSelectedModelId(selectedModelId);
-
+      print('[AI Runtime] Calling isModelDownloaded...');
       final downloaded = await repo.isModelDownloaded();
       print('[AI Runtime] Model downloaded: $downloaded');
 
@@ -178,12 +178,15 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
 
   Future<void> refreshDownloadedModels() async {
     final repo = ref.read(aiRepositoryProvider);
-    final downloaded = <String>{};
-    for (final model in AiModelRegistry.models) {
-      if (await repo.isModelDownloaded(model.id)) {
-        downloaded.add(model.id);
-      }
-    }
+    // Do a single discovery pass, then check all models against the cache
+    // This avoids 18+ separate file I/O operations
+    await repo.initialize();
+    
+    // Do discovery once
+    await repo.performDiscovery();
+    
+    // Get the discovered models
+    final downloaded = repo.getDiscoveredModels();
     state = state.copyWith(downloadedModels: downloaded);
   }
 
