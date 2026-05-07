@@ -8,6 +8,10 @@ final biometricAuthProvider = Provider<BiometricAuth>((ref) {
 
 class BiometricAuth {
   final LocalAuthentication _auth = LocalAuthentication();
+  static bool _isAuthorized = false;
+
+  bool get isAuthorized => _isAuthorized;
+  void setAuthorized(bool value) => _isAuthorized = value;
 
   /// Attempts to authenticate the user biometrically.
   /// Returns [true] if successful, or if biometrics are not available.

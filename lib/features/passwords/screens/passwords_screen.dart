@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:second_brain_app/core/security/biometric_auth.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:google_fonts/google_fonts.dart';
@@ -38,12 +39,17 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: isDark ? const Color(0xFF1E1A25) : const Color(0xFFF9F5FF),
+      backgroundColor: isDark
+          ? const Color(0xFF1E1A25)
+          : const Color(0xFFF9F5FF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF5A49D6)),
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? Colors.white : const Color(0xFF5A49D6),
+          ),
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -104,7 +110,9 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                             style: GoogleFonts.inter(
                               fontSize: 48,
                               fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF3F2A6E),
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF3F2A6E),
                               letterSpacing: -1,
                             ),
                           ),
@@ -113,7 +121,9 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                             'Securely managing ${vault.passwords.length} access credentials',
                             style: TextStyle(
                               fontSize: 16,
-                              color: isDark ? Colors.white70 : const Color(0xFF5A5A5A),
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF5A5A5A),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -128,15 +138,22 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF6366F1).withOpacity(0.3),
+                                  color: const Color(
+                                    0xFF6366F1,
+                                  ).withOpacity(0.3),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
                             child: ElevatedButton.icon(
-                              onPressed: () => _showPasswordDialog(context, ref),
-                              icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                              onPressed: () =>
+                                  _showPasswordDialog(context, ref),
+                              icon: const Icon(
+                                Icons.add,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                               label: const Text(
                                 'Add Password',
                                 style: TextStyle(
@@ -148,7 +165,9 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
-                                padding: const EdgeInsets.symmetric(vertical: 18),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 18,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(32),
                                 ),
@@ -158,23 +177,35 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                           const SizedBox(height: 24),
                           Container(
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF2C2533) : const Color(0xFFF3EDFD),
+                              color: isDark
+                                  ? const Color(0xFF2C2533)
+                                  : const Color(0xFFF3EDFD),
                               borderRadius: BorderRadius.circular(32),
                               border: Border.all(
-                                color: isDark ? Colors.white12 : const Color(0xFFD1C5E4).withOpacity(0.5),
+                                color: isDark
+                                    ? Colors.white12
+                                    : const Color(0xFFD1C5E4).withOpacity(0.5),
                               ),
                             ),
                             child: TextField(
                               controller: _searchController,
-                              onChanged: (val) => setState(() => _searchQuery = val),
-                              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                              onChanged: (val) =>
+                                  setState(() => _searchQuery = val),
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
                               decoration: InputDecoration(
                                 hintText: 'Search passwords...',
                                 hintStyle: TextStyle(
-                                  color: isDark ? Colors.white54 : const Color(0xFF9E8DB3),
+                                  color: isDark
+                                      ? Colors.white54
+                                      : const Color(0xFF9E8DB3),
                                 ),
                                 border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 18,
+                                ),
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -194,20 +225,27 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                                 child: Text(
                                   'No passwords found.',
                                   style: TextStyle(
-                                    color: isDark ? Colors.white54 : const Color(0xFF6B5A8E),
+                                    color: isDark
+                                        ? Colors.white54
+                                        : const Color(0xFF6B5A8E),
                                   ),
                                 ),
                               ),
                             ),
                           )
                         : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final password = filteredPasswords[index];
-                                return _buildPasswordCard(context, ref, password, isDark);
-                              },
-                              childCount: filteredPasswords.length,
-                            ),
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              final password = filteredPasswords[index];
+                              return _buildPasswordCard(
+                                context,
+                                ref,
+                                password,
+                                isDark,
+                              );
+                            }, childCount: filteredPasswords.length),
                           ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 40)),
@@ -220,12 +258,19 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
     );
   }
 
-  Widget _buildPasswordCard(BuildContext context, WidgetRef ref, VaultPassword password, bool isDark) {
+  Widget _buildPasswordCard(
+    BuildContext context,
+    WidgetRef ref,
+    VaultPassword password,
+    bool isDark,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2A2435).withOpacity(0.8) : Colors.white.withOpacity(0.8),
+        color: isDark
+            ? const Color(0xFF2A2435).withOpacity(0.8)
+            : Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
           color: isDark ? Colors.white12 : Colors.white,
@@ -272,7 +317,10 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           const SizedBox(width: 8),
           IconButton(
             onPressed: () async {
-              if (!await _authorize(context, ref) || !context.mounted) return;
+              if (!await _authorize(context, ref, action: 'view password') ||
+                  !context.mounted) {
+                return;
+              }
               showDialog<void>(
                 context: context,
                 builder: (context) => AlertDialog(
@@ -287,7 +335,11 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                 ),
               );
             },
-            icon: Icon(Icons.visibility_outlined, color: isDark ? Colors.white54 : const Color(0xFF8C8C8C), size: 20),
+            icon: Icon(
+              Icons.visibility_outlined,
+              color: isDark ? Colors.white54 : const Color(0xFF8C8C8C),
+              size: 20,
+            ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             tooltip: 'View password',
@@ -295,34 +347,54 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           const SizedBox(width: 16),
           IconButton(
             onPressed: () async {
-              if (!await _authorize(context, ref) || !context.mounted) return;
+              if (!await _authorize(context, ref, action: 'copy password') ||
+                  !context.mounted) {
+                return;
+              }
               await Clipboard.setData(ClipboardData(text: password.password));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Password copied')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Password copied')));
             },
-            icon: Icon(Icons.copy_outlined, color: isDark ? Colors.white54 : const Color(0xFF8C8C8C), size: 20),
+            icon: Icon(
+              Icons.copy_outlined,
+              color: isDark ? Colors.white54 : const Color(0xFF8C8C8C),
+              size: 20,
+            ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             tooltip: 'Copy password',
           ),
           const SizedBox(width: 16),
           PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: isDark ? Colors.white54 : const Color(0xFF8C8C8C), size: 20),
+            icon: Icon(
+              Icons.more_vert,
+              color: isDark ? Colors.white54 : const Color(0xFF8C8C8C),
+              size: 20,
+            ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onSelected: (value) async {
-              if (!await _authorize(context, ref) || !context.mounted) return;
               if (value == 'edit') {
+                if (!await _authorize(context, ref, action: 'edit password') ||
+                    !context.mounted) {
+                  return;
+                }
                 _showPasswordDialog(context, ref, password);
               } else if (value == 'delete') {
+                if (!await _authorize(context, ref, action: 'delete password') ||
+                    !context.mounted) {
+                  return;
+                }
                 final confirmed = await showDeleteConfirmation(
                   context,
                   itemType: 'Password',
                   itemName: password.accountName,
                 );
                 if (confirmed && context.mounted) {
-                  ref.read(vaultControllerProvider.notifier).deletePassword(password.id);
+                  ref
+                      .read(vaultControllerProvider.notifier)
+                      .deletePassword(password.id);
                 }
               }
             },
@@ -336,44 +408,32 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
     );
   }
 
-  Future<bool> _authorize(BuildContext context, WidgetRef ref) async {
+  Future<bool> _authorize(
+    BuildContext context,
+    WidgetRef ref, {
+    required String action,
+  }) async {
     final settings = ref.read(settingsControllerProvider);
     if (!settings.biometricEnabled) return true;
 
-    try {
-      final canAuthenticate = await _localAuth.canCheckBiometrics;
-      final deviceSupported = await _localAuth.isDeviceSupported();
-      if (!canAuthenticate || !deviceSupported) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Biometric authentication is not available on this device.'),
-            ),
-          );
-        }
-        return false;
-      }
+    final biometricAuth = ref.read(biometricAuthProvider);
 
-      final didAuthenticate = await _localAuth.authenticate(
-        localizedReason: 'Authenticate to access saved passwords',
-        options: const AuthenticationOptions(
-          biometricOnly: true,
-          stickyAuth: true,
-          sensitiveTransaction: true,
-        ),
+    try {
+      final didAuthenticate = await biometricAuth.authenticate(
+        reason: 'Authenticate to $action',
       );
 
       if (!didAuthenticate && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Authentication cancelled.')),
+          const SnackBar(content: Text('Authentication required.')),
         );
       }
 
       return didAuthenticate;
-    } on PlatformException catch (error) {
+    } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Authentication failed: ${error.message ?? error.code}')),
+          SnackBar(content: Text('Authentication failed: $e')),
         );
       }
       return false;
@@ -411,7 +471,9 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
   @override
   void initState() {
     super.initState();
-    _accountController = TextEditingController(text: widget.item?.accountName ?? '');
+    _accountController = TextEditingController(
+      text: widget.item?.accountName ?? '',
+    );
     _userController = TextEditingController(text: widget.item?.username ?? '');
     _passController = TextEditingController(text: widget.item?.password ?? '');
   }
@@ -448,7 +510,7 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                 color: Colors.black.withOpacity(0.1),
                 blurRadius: 30,
                 offset: const Offset(0, 10),
-              )
+              ),
             ],
           ),
           child: SingleChildScrollView(
@@ -467,7 +529,11 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                       end: Alignment.bottomRight,
                     ),
                   ),
-                  child: const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 24),
+                  child: const Icon(
+                    Icons.lock_outline_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 // Title
@@ -493,7 +559,7 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Account Name Input
                 _buildInputField(
                   controller: _accountController,
@@ -505,7 +571,7 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                   hintColor: hintColor,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Username Input
                 _buildInputField(
                   controller: _userController,
@@ -517,10 +583,13 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                   hintColor: hintColor,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Password Input
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: fieldBg,
                     borderRadius: BorderRadius.circular(24),
@@ -536,7 +605,10 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                           style: TextStyle(fontSize: 15, color: textColor),
                           decoration: InputDecoration(
                             hintText: 'Password',
-                            hintStyle: TextStyle(fontSize: 15, color: hintColor),
+                            hintStyle: TextStyle(
+                              fontSize: 15,
+                              color: hintColor,
+                            ),
                             border: InputBorder.none,
                             isDense: true,
                           ),
@@ -544,7 +616,9 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                       ),
                       IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
                           color: iconColor,
                           size: 20,
                         ),
@@ -558,7 +632,7 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Action Buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -569,7 +643,9 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                         'Cancel',
                         style: TextStyle(
                           fontSize: 16,
-                          color: isDark ? Colors.white70 : const Color(0xFF6B4BA3),
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF6B4BA3),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -610,7 +686,10 @@ class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 14,
+                          ),
                         ),
                         child: Text(
                           widget.item == null ? 'Save Password' : 'Update',
