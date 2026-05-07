@@ -190,19 +190,25 @@ class DartBridgeLLM {
   }
 
   /// Unload the current model.
+  ///
+  /// Completely destroys the native component to ensure full memory reclamation
+  /// by the operating system. This is necessary when switching between large
+  /// models (e.g., 2GB+) to prevent performance degradation.
   void unload() {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cleanupFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_cleanup');
+      // Cancel any active generation first
+      cancel();
 
-      cleanupFn(_handle!);
-      _loadedModelId = null;
-      _logger.info('LLM model unloaded');
+      // Call destroy instead of cleanup to fully release C++ resources and RAM
+      destroy();
+      _logger.info('LLM component destroyed and RAM released');
     } catch (e) {
-      _logger.error('Failed to unload LLM model: $e');
+      _logger.error('Failed to fully unload LLM model: $e');
+    } finally {
+      _handle = null;
+      _loadedModelId = null;
     }
   }
 
