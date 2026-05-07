@@ -393,4 +393,55 @@ class AssistantTools {
   static String _referenceTag(String type, String id, String title) {
     return '[[${type.toLowerCase()}:$id|$title]]';
   }
+
+  static Future<Map<String, ToolValue>> handleAlias(
+    Ref ref,
+    String targetTool,
+    Map<String, ToolValue> args, {
+    String? aliasCalled,
+  }) async {
+    // Create a mutable copy to avoid unmodifiable map errors
+    final mutableArgs = Map<String, ToolValue>.from(args);
+
+    // Flexible Argument Recovery:
+    if (targetTool == 'search_vault' &&
+        (mutableArgs['query']?.stringValue ?? '').trim().isEmpty) {
+      if (aliasCalled == 'get_grocery') {
+        mutableArgs['query'] = const StringToolValue('grocery');
+      } else {
+        for (final val in args.values) {
+          if (val is StringToolValue && val.value.isNotEmpty) {
+            mutableArgs['query'] = val;
+            break;
+          }
+          if (val is ArrayToolValue && val.value.isNotEmpty) {
+            final first = val.value.first;
+            mutableArgs['query'] = StringToolValue(first.stringValue ?? first.toString());
+            break;
+          }
+        }
+      }
+    }
+
+    switch (targetTool) {
+      case 'create_note':
+        return _createNote(ref, mutableArgs);
+      case 'create_password':
+        return _createPassword(ref, mutableArgs);
+      case 'create_event':
+        return _createEvent(ref, mutableArgs);
+      case 'create_document':
+        return _createDocument(ref, mutableArgs);
+      case 'search_vault':
+        return _searchVault(ref, mutableArgs);
+      case 'list_vault_items':
+        return _listVaultItems(ref, mutableArgs);
+      case 'get_item_by_id':
+        return _getItemById(ref, mutableArgs);
+      default:
+        return {
+          'error': StringToolValue('Alias target not found: $targetTool'),
+        };
+    }
+  }
 }
