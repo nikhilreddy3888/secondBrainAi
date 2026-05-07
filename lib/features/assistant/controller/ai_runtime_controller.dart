@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -102,6 +104,24 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
         );
         print('[AI Runtime] Model not downloaded, waiting for download');
         return;
+      }
+
+      // On Android, check model file size before auto-loading.
+      // Models above ~500 MB can cause the Android OOM killer to terminate
+      // the process with SIGKILL during native memory allocation, which
+      // cannot be caught by Dart try/catch. In that case we show a "Load"
+      // button and let the user trigger loading manually.
+      if (Platform.isAndroid) {
+        final modelSizeMB = await repo.getModelFileSizeMB();
+        if (modelSizeMB > 500) {
+          state = state.copyWith(
+            initialized: true,
+            modelDownloaded: true,
+            modelLoaded: false,
+            status: '${repo.modelName} ready. Tap Load to start.',
+          );
+          return;
+        }
       }
 
       state = state.copyWith(
@@ -247,13 +267,36 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
           modelDownloaded: progress.state == DownloadProgressState.completed || state.modelDownloaded,
           progress: progress.percentage.clamp(0, 1),
           status: progress.state == DownloadProgressState.completed
-              ? 'Download complete. Loading model...'
+              ? 'Download complete.'
               : 'Downloading model ${(progress.percentage * 100).toStringAsFixed(0)}%',
         );
       }
-      print('[AI Runtime] Download complete, loading model');
-      await repo.loadModel();
       await refreshDownloadedModels();
+
+      // On Android, large models should not auto-load right after download.
+      // The download itself consumed significant memory, and immediately
+      // loading a 1GB+ model will trigger Android's OOM killer (SIGKILL).
+      // Show a "Load" button so the user can load when ready.
+      if (Platform.isAndroid) {
+        final modelSizeMB = await repo.getModelFileSizeMB();
+        if (modelSizeMB > 500) {
+          state = state.copyWith(
+            initialized: true,
+            downloading: false,
+            modelDownloaded: true,
+            modelLoaded: false,
+            progress: 1,
+            status: 'Download complete. Tap Load to start ${repo.modelName}.',
+          );
+          return;
+        }
+      }
+
+      // Small models or non-Android: auto-load after download
+      // Brief pause to let the Dart GC reclaim the large download buffers.
+      print('[AI Runtime] Download complete, loading model');
+      await Future.delayed(const Duration(milliseconds: 500));
+      await repo.loadModel();
       print('[AI Runtime] Model loaded successfully');
       state = state.copyWith(
         initialized: true,
@@ -265,13 +308,17 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       );
     } catch (error) {
       print('[AI Runtime] Error during download/load: $error');
+      final errMsg = error.toString();
+      final isMemoryIssue = errMsg.contains('too large') || errMsg.contains('minimal settings');
       state = state.copyWith(
         initialized: true,
         downloading: false,
         modelDownloaded: await repo.isModelDownloaded(),
         modelLoaded: false,
-        status: 'Model setup failed.',
-        error: error.toString(),
+        status: isMemoryIssue
+            ? 'Model too large for this device. Try a smaller model.'
+            : 'Model setup failed.',
+        error: errMsg,
       );
     }
   }
@@ -292,12 +339,16 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       );
     } catch (error) {
       print('[AI Runtime] Error loading model: $error');
+      final errMsg = error.toString();
+      final isMemoryIssue = errMsg.contains('too large') || errMsg.contains('minimal settings');
       state = state.copyWith(
         initialized: true,
         modelDownloaded: await repo.isModelDownloaded(),
         modelLoaded: false,
-        status: 'Could not load local model.',
-        error: error.toString(),
+        status: isMemoryIssue
+            ? 'Model too large for this device. Try a smaller model.'
+            : 'Could not load local model.',
+        error: errMsg,
       );
     }
   }
