@@ -8,12 +8,28 @@ import 'features/settings/controller/settings_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint('App starting...');
   
   final container = ProviderContainer();
   final notificationService = container.read(notificationServiceProvider);
-  await notificationService.initialize();
-  await notificationService.requestPermissions();
+  
+  debugPrint('Initializing notification service...');
+  try {
+    await notificationService.initialize();
+    debugPrint('Notification service initialized.');
+  } catch (e) {
+    debugPrint('Failed to initialize notification service: $e');
+  }
 
+  debugPrint('Requesting permissions...');
+  try {
+    await notificationService.requestPermissions();
+    debugPrint('Permissions requested.');
+  } catch (e) {
+    debugPrint('Failed to request permissions: $e');
+  }
+
+  debugPrint('Running app...');
   runApp(
     UncontrolledProviderScope(
       container: container,

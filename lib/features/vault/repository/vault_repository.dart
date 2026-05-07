@@ -7,35 +7,54 @@ import 'package:sqflite_sqlcipher/sqflite.dart';
 import '../../../models/vault_model.dart';
 import '../../../core/data/database_helper.dart';
 import '../../../core/security/biometric_auth.dart';
+import '../../settings/controller/settings_controller.dart';
 
 final vaultRepositoryProvider = Provider<VaultRepository>((ref) {
   return VaultRepository(
+    ref,
     ref.read(databaseHelperProvider),
     ref.read(biometricAuthProvider),
   );
 });
 
 class VaultRepository {
+  final Ref _ref;
   final DatabaseHelper _dbHelper;
   final BiometricAuth _biometricAuth;
   static const _storage = FlutterSecureStorage();
   static const _vaultKey = 'encrypted_local_vault_v1';
   bool _isAuthenticated = false;
 
-  VaultRepository(this._dbHelper, this._biometricAuth);
+  VaultRepository(this._ref, this._dbHelper, this._biometricAuth);
+
+  void markAsAuthenticated() {
+    _isAuthenticated = true;
+    _biometricAuth.setAuthorized(true);
+  }
 
   Future<void> _ensureAuthenticated() async {
-    if (!_isAuthenticated) {
+    // Check settings first
+    final settings = _ref.read(settingsControllerProvider);
+    if (!settings.biometricEnabled) {
+      _isAuthenticated = true;
+      _biometricAuth.setAuthorized(true);
+      return;
+    }
+
+    if (!_isAuthenticated && !_biometricAuth.isAuthorized) {
       final success = await _biometricAuth.authenticate();
       if (!success) {
         throw Exception('Biometric authentication failed. Cannot access vault.');
       }
       _isAuthenticated = true;
+      _biometricAuth.setAuthorized(true);
     }
   }
 
   Future<VaultData> load() async {
-    await _ensureAuthenticated();
+    // Initial load does NOT require explicit auth here,
+    // as the UI (DashboardScreen) will handle the lock screen.
+    // This prevents a double-prompt on app startup.
     
     final db = await _dbHelper.database;
     
