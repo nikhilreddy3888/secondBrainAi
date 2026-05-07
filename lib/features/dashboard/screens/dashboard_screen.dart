@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:second_brain_app/features/vault/repository/vault_repository.dart';
 
 import '../../../core/theme.dart';
 import '../../../models/vault_model.dart';
@@ -36,7 +37,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _searchQuery = _searchController.text;
       });
     });
-    
+
     // Check for biometric lock on startup
     Future.microtask(() => _checkBiometricLock());
   }
@@ -44,12 +45,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Future<void> _checkBiometricLock() async {
     // Wait a tiny bit to ensure SettingsController has a chance to start its _load
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     final settings = ref.read(settingsControllerProvider);
-    
-    // If settings haven't loaded yet (still default), we might need to wait 
-    // but the default is biometricEnabled = true, so it's safe.
-    
+
     if (!settings.biometricEnabled) {
       if (mounted) {
         setState(() {
@@ -69,7 +67,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           useErrorDialogs: true,
         ),
       );
-      
+
+      if (didAuthenticate) {
+        ref.read(vaultRepositoryProvider).markAsAuthenticated();
+      }
+
       if (mounted) {
         setState(() {
           _isAuthorized = didAuthenticate;
@@ -80,14 +82,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       debugPrint('Biometric auth error: $e');
       if (mounted) {
         setState(() {
-          // On error, stay locked but stop the loading spinner 
-          // so the user can see the "Unlock Now" button
-          _isAuthorized = false; 
+          // On error, stay locked but stop the loading spinner
+          _isAuthorized = false;
           _isCheckingAuth = false;
         });
       }
     }
   }
+
 
   @override
   void dispose() {
@@ -106,7 +108,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.psychology, size: 64, color: theme.colorScheme.primary),
+              Icon(
+                Icons.psychology,
+                size: 64,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(height: 24),
               const CircularProgressIndicator(),
             ],
@@ -127,7 +133,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   color: theme.colorScheme.primaryContainer,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.lock_outline_rounded, size: 48, color: theme.colorScheme.primary),
+                child: Icon(
+                  Icons.lock_outline_rounded,
+                  size: 48,
+                  color: theme.colorScheme.primary,
+                ),
               ),
               const SizedBox(height: 24),
               Text(
@@ -158,7 +168,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -220,34 +233,56 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       actions: [
         PopupMenuButton<String>(
-          icon: Icon(Icons.settings_outlined, color: theme.colorScheme.onSurface),
+          icon: Icon(
+            Icons.settings_outlined,
+            color: theme.colorScheme.onSurface,
+          ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           color: theme.colorScheme.surface,
           onSelected: (value) {
             if (value == 'dark_mode') {
-              final currentTheme = ref.read(settingsControllerProvider).themeMode;
-              final newTheme = currentTheme == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-              ref.read(settingsControllerProvider.notifier).setThemeMode(newTheme);
+              final currentTheme = ref
+                  .read(settingsControllerProvider)
+                  .themeMode;
+              final newTheme = currentTheme == ThemeMode.dark
+                  ? ThemeMode.light
+                  : ThemeMode.dark;
+              ref
+                  .read(settingsControllerProvider.notifier)
+                  .setThemeMode(newTheme);
             } else if (value == 'about') {
               showAboutDialog(
                 context: context,
                 applicationName: 'Second Brain',
                 applicationVersion: '1.0.0',
-                applicationIcon: Icon(Icons.psychology, size: 48, color: theme.appBarTheme.foregroundColor),
+                applicationIcon: Icon(
+                  Icons.psychology,
+                  size: 48,
+                  color: theme.appBarTheme.foregroundColor,
+                ),
                 children: [
-                  const Text('Your AI-powered personal knowledge vault. Safely store notes, passwords, documents, and events.'),
+                  const Text(
+                    'Your AI-powered personal knowledge vault. Safely store notes, passwords, documents, and events.',
+                  ),
                 ],
               );
             }
           },
           itemBuilder: (context) {
-            final isDark = ref.watch(settingsControllerProvider).themeMode == ThemeMode.dark;
+            final isDark =
+                ref.watch(settingsControllerProvider).themeMode ==
+                ThemeMode.dark;
             return [
               PopupMenuItem(
                 value: 'dark_mode',
                 child: Row(
                   children: [
-                    Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 20),
+                    Icon(
+                      isDark
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined,
+                      size: 20,
+                    ),
                     const SizedBox(width: 12),
                     Text(isDark ? 'Light Mode' : 'Dark Mode'),
                   ],
@@ -282,7 +317,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         decoration: InputDecoration(
           hintText: 'Search notes, passwords, events, documents...',
           hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-          prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
+          prefixIcon: Icon(
+            Icons.search,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
@@ -334,7 +372,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 onTap: () => context.push('/events'),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.actionButtonColor,
                     borderRadius: BorderRadius.circular(12),
@@ -344,7 +385,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.calendar_today_outlined, color: Colors.white, size: 20),
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Events',
@@ -368,7 +413,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 onTap: () => context.push('/documents'),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.actionButtonColor,
                     borderRadius: BorderRadius.circular(12),
@@ -378,7 +426,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.description_outlined, color: Colors.white, size: 20),
+                          Icon(
+                            Icons.description_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Documents',
@@ -405,8 +457,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildNotesList(BuildContext context, WidgetRef ref, ThemeData theme) {
     final vault = ref.watch(vaultControllerProvider);
     return vault.when(
-      loading: () => const SliverFillRemaining(child: Center(child: CircularProgressIndicator())),
-      error: (error, stack) => SliverFillRemaining(child: Center(child: Text(error.toString()))),
+      loading: () => const SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) =>
+          SliverFillRemaining(child: Center(child: Text(error.toString()))),
       data: (vault) {
         if (_searchQuery.trim().isNotEmpty) {
           final results = vault.search(_searchQuery);
@@ -423,40 +478,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           return SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final result = results[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: theme.colorScheme.outline),
-                      ),
-                      child: ListTile(
-                        leading: Icon(result.icon),
-                        title: Text(result.title),
-                        subtitle: Text(
-                          '${result.type} - ${result.subtitle}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () => _openSearchResult(context, vault, result),
-                        trailing: result.secret == null
-                            ? null
-                            : const Icon(Icons.lock_outline),
-                      ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final result = results[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: theme.colorScheme.outline),
                     ),
-                  );
-                },
-                childCount: results.length,
-              ),
+                    child: ListTile(
+                      leading: Icon(result.icon),
+                      title: Text(result.title),
+                      subtitle: Text(
+                        '${result.type} - ${result.subtitle}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => _openSearchResult(context, vault, result),
+                      trailing: result.secret == null
+                          ? null
+                          : const Icon(Icons.lock_outline),
+                    ),
+                  ),
+                );
+              }, childCount: results.length),
             ),
           );
         }
         final notes = vault.notes;
-        
+
         if (notes.isEmpty) {
           return SliverFillRemaining(
             child: Center(
@@ -470,121 +522,119 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final note = notes[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.colorScheme.surface,
-                          theme.colorScheme.surfaceContainerHighest,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: theme.colorScheme.outlineVariant,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final note = notes[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.surface,
+                        theme.colorScheme.surfaceContainerHighest,
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                note.title,
-                                style: GoogleFonts.playfairDisplay(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.onSurface,
-                                ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              note.title,
+                              style: GoogleFonts.playfairDisplay(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                InkWell(
-                                  onTap: () {
-                                    context.push('/notes/add', extra: note);
-                                  },
-                                  child: Icon(
-                                    Icons.edit,
-                                    size: 20,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                InkWell(
-                                  onTap: () async {
-                                    final confirmed = await showDeleteConfirmation(
-                                      context,
-                                      itemType: 'Note',
-                                      itemName: note.title,
-                                    );
-                                    if (confirmed && context.mounted) {
-                                      ref.read(vaultControllerProvider.notifier).deleteNote(note.id);
-                                    }
-                                  },
-                                  child: Icon(
-                                    Icons.delete_outline,
-                                    size: 20,
-                                    color: theme.colorScheme.error,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          note.content,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            height: 1.4,
                           ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  context.push('/notes/add', extra: note);
+                                },
+                                child: Icon(
+                                  Icons.edit,
+                                  size: 20,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              InkWell(
+                                onTap: () async {
+                                  final confirmed =
+                                      await showDeleteConfirmation(
+                                        context,
+                                        itemType: 'Note',
+                                        itemName: note.title,
+                                      );
+                                  if (confirmed && context.mounted) {
+                                    ref
+                                        .read(vaultControllerProvider.notifier)
+                                        .deleteNote(note.id);
+                                  }
+                                },
+                                child: Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        note.content,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.4,
                         ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 14,
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            note.updatedAt.toIso8601String().substring(0, 10),
+                            style: TextStyle(
+                              fontSize: 12,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              note.updatedAt.toIso8601String().substring(0, 10),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                );
-              },
-              childCount: notes.length,
-            ),
+                ),
+              );
+            }, childCount: notes.length),
           ),
         );
       },
@@ -598,27 +648,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   ) async {
     switch (result.type) {
       case 'Note':
-        final note = vault.notes.where((item) => item.id == result.id).firstOrNull;
+        final note = vault.notes
+            .where((item) => item.id == result.id)
+            .firstOrNull;
         if (note != null) {
           context.push('/notes/add', extra: note);
         }
         return;
       case 'Document':
-        final document =
-            vault.documents.where((item) => item.id == result.id).firstOrNull;
+        final document = vault.documents
+            .where((item) => item.id == result.id)
+            .firstOrNull;
         if (document != null) {
           DocumentsScreen.openDocument(context, document);
         }
         return;
       case 'Event':
-        final event = vault.events.where((item) => item.id == result.id).firstOrNull;
+        final event = vault.events
+            .where((item) => item.id == result.id)
+            .firstOrNull;
         if (event != null && context.mounted) {
           final dialogResult = await showDialog<VaultEvent>(
             context: context,
             builder: (context) => EventDialog(event: event),
           );
           if (dialogResult != null && dialogResult.title.isNotEmpty) {
-            await ref.read(vaultControllerProvider.notifier).upsertEvent(dialogResult);
+            await ref
+                .read(vaultControllerProvider.notifier)
+                .upsertEvent(dialogResult);
           }
         }
         return;
@@ -644,9 +701,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
-          border: Border(
-            top: BorderSide(color: theme.colorScheme.outline),
-          ),
+          border: Border(top: BorderSide(color: theme.colorScheme.outline)),
         ),
         child: Row(
           children: [
@@ -679,7 +734,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         style: TextStyle(color: theme.colorScheme.onSurface),
                         decoration: InputDecoration(
                           hintText: 'Ask your second brain...',
-                          hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                          hintStyle: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                           border: InputBorder.none,
                         ),
                       ),
@@ -704,11 +761,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   color: AppTheme.actionButtonColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.send,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                child: const Icon(Icons.send, color: Colors.white, size: 20),
               ),
             ),
           ],

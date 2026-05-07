@@ -678,6 +678,15 @@ class _ModelPickerSheet extends ConsumerStatefulWidget {
 class _ModelPickerSheetState extends ConsumerState<_ModelPickerSheet> {
   String _search = '';
 
+  @override
+  void initState() {
+    super.initState();
+    // Refresh downloaded models when opening the picker to ensure the "Downloaded" section is accurate
+    Future.microtask(() {
+      ref.read(aiRuntimeControllerProvider.notifier).refreshDownloadedModels();
+    });
+  }
+
   List<AiModelInfo> get _filteredModels {
     if (_search.isEmpty) return AiModelRegistry.models;
     final q = _search.toLowerCase();

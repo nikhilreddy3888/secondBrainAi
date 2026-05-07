@@ -182,8 +182,8 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
     // This avoids 18+ separate file I/O operations
     await repo.initialize();
     
-    // Do discovery once
-    await repo.performDiscovery();
+    // Ensure models are registered (uses cache and serialization)
+    await repo.ensureModelsRegistered();
     
     // Get the discovered models
     final downloaded = repo.getDiscoveredModels();
@@ -309,8 +309,9 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
         progress: 1,
         status: '${repo.modelName} loaded on device.',
       );
-    } catch (error) {
+    } catch (error, stack) {
       print('[AI Runtime] Error during download/load: $error');
+      print('[AI Runtime] Stack trace during download/load: $stack');
       final errMsg = error.toString();
       final isMemoryIssue = errMsg.contains('too large') || errMsg.contains('minimal settings');
       state = state.copyWith(
@@ -340,8 +341,9 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
         progress: 1,
         status: '${repo.modelName} loaded on device.',
       );
-    } catch (error) {
+    } catch (error, stack) {
       print('[AI Runtime] Error loading model: $error');
+      print('[AI Runtime] Stack trace: $stack');
       final errMsg = error.toString();
       final isMemoryIssue = errMsg.contains('too large') || errMsg.contains('minimal settings');
       state = state.copyWith(
