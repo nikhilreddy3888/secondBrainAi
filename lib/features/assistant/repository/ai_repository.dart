@@ -93,6 +93,15 @@ class AiRepository {
     return null;
   }
 
+  /// Returns the file size of the currently selected model in megabytes,
+  /// or 0 if the model file doesn't exist.
+  Future<int> getModelFileSizeMB([String? modelId]) async {
+    final path = await _getExistingModelFilePath(modelId);
+    if (path == null) return 0;
+    final bytes = await File(path).length();
+    return bytes ~/ (1024 * 1024);
+  }
+
   Future<void> deleteModel(String modelId) async {
     await initialize();
     final model = AiModelRegistry.findById(modelId);
@@ -131,6 +140,54 @@ class AiRepository {
     }
   }
 
+  /// Computes safe loading parameters for Android based on model file size.
+  ///
+  /// IMPORTANT: On Android, if the native llama.cpp allocation exceeds
+  /// available memory, the OS sends SIGKILL which terminates the entire
+  /// process instantly. This CANNOT be caught by Dart try/catch. Therefore
+  /// we must be very conservative on the first (and only) attempt — there
+  /// is no second chance.
+  ///
+  /// Memory budget for a typical Android device (4-6 GB RAM):
+  ///   - OS + background apps: ~2-3 GB
+  ///   - App process overhead: ~200 MB
+  ///   - Model weights (mmap): ~model file size
+  ///   - KV cache: scales with contextSize × model dimensions
+  ///   - Available for model: ~1-2 GB
+  ({int contextSize, int gpuLayers}) _androidLoadParams(
+    int fileSizeMB,
+    int requestedContextSize,
+  ) {
+    if (fileSizeMB < 400) {
+      // Tiny models (< 400MB): safe for GPU + full context
+      return (contextSize: requestedContextSize, gpuLayers: 32);
+    } else if (fileSizeMB < 500) {
+      // Small models (400-500MB): CPU only, full context
+      return (contextSize: requestedContextSize, gpuLayers: 0);
+    } else {
+      // Any model ≥ 500MB: CPU only, minimal context (512 tokens).
+      // A 1GB model + 512-ctx KV cache ≈ 1.05 GB total native memory.
+      // This is the most conservative setting that allows the model to
+      // actually function. Going higher risks SIGKILL on most devices.
+      return (contextSize: 512, gpuLayers: 0);
+    }
+  }
+
+  /// Reads total device RAM from /proc/meminfo on Android (in MB).
+  /// Returns 0 if the file cannot be read.
+  Future<int> _getDeviceRamMB() async {
+    try {
+      final meminfo = await File('/proc/meminfo').readAsString();
+      // First line: "MemTotal:     2048000 kB"
+      final match = RegExp(r'MemTotal:\s+(\d+)\s+kB').firstMatch(meminfo);
+      if (match != null) {
+        final kb = int.parse(match.group(1)!);
+        return kb ~/ 1024;
+      }
+    } catch (_) {}
+    return 0;
+  }
+
   Future<void> _loadModelInternal() async {
     await initialize();
     final modelPath = await _getExistingModelFilePath();
@@ -139,23 +196,52 @@ class AiRepository {
     }
 
     final model = _selectedModel;
+    final tools = [
+      CreateNoteTool(ref, _toolTurnLimiter),
+      CreatePasswordTool(ref, _toolTurnLimiter),
+      ScheduleEventTool(ref, _toolTurnLimiter),
+      CreateDocumentTool(ref, _toolTurnLimiter),
+    ];
 
-    // Initialize the Agent Kit with the correct template for the selected model
+    int contextSize = model.contextSize;
+    int gpuLayers = 0;
+
+    if (Platform.isAndroid) {
+      final fileSizeBytes = await File(modelPath).length();
+      final fileSizeMB = fileSizeBytes ~/ (1024 * 1024);
+
+      // Check if the device has enough RAM to safely load this model.
+      // The model needs native memory for weights + KV cache + overhead.
+      // If the model file is larger than 40% of total RAM, the OS will
+      // kill the process shortly after loading (even if the load itself
+      // succeeds, there won't be enough RAM left for the rest of the OS).
+      final deviceRamMB = await _getDeviceRamMB();
+
+      if (deviceRamMB > 0 && fileSizeMB > deviceRamMB * 0.4) {
+        throw StateError(
+          'Not enough device memory to load ${model.displayName} '
+          '(${fileSizeMB}MB). Your device has ${deviceRamMB}MB RAM. '
+          'Models should be under ${(deviceRamMB * 0.4).round()}MB '
+          'for your device. Please choose a smaller model.',
+        );
+      }
+
+      final params = _androidLoadParams(fileSizeMB, model.contextSize);
+      contextSize = params.contextSize;
+      gpuLayers = params.gpuLayers;
+    }
+
     await _kit.initialize(
       modelPath: modelPath,
       template: _templateForModel(model),
-      contextSize: model.contextSize,
-      gpuLayers: Platform.isAndroid ? 32 : 0,
-      customTools: [
-        CreateNoteTool(ref, _toolTurnLimiter),
-        CreatePasswordTool(ref, _toolTurnLimiter),
-        ScheduleEventTool(ref, _toolTurnLimiter),
-        CreateDocumentTool(ref, _toolTurnLimiter),
-      ],
+      contextSize: contextSize,
+      gpuLayers: gpuLayers,
+      customTools: tools,
     );
 
     _kitInitialized = true;
   }
+
 
   Stream<DownloadProgress> downloadModel() async* {
     await initialize();
