@@ -347,7 +347,7 @@ class AiModelRegistry {
   ];
 
   /// The default model to auto-select on first launch.
-  static AiModelInfo get defaultModel => models.first;
+  static AiModelInfo get defaultModel => models.firstWhere((m) => m.id == 'gemma-3-1b-it-q4');
 
   /// Look up a model by its ID, falling back to the default.
   static AiModelInfo findById(String id) {
