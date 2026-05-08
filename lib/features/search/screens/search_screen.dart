@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:second_brain_app/features/events/screens/widgets/event_dialog.dart';
 
 import '../../../core/security/biometric_auth.dart';
 import '../../../models/vault_model.dart';
@@ -62,7 +63,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               Expanded(
                 child: EmptyAwareList(
                   isEmpty: _query.isEmpty || results.isEmpty,
-                  emptyText: _query.isEmpty ? 'Start typing to search.' : 'No results found.',
+                  emptyText: _query.isEmpty
+                      ? 'Start typing to search.'
+                      : 'No results found.',
                   child: ListView.separated(
                     itemCount: results.length,
                     separatorBuilder: (_, index) => const SizedBox.shrink(),
@@ -75,17 +78,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           decoration: BoxDecoration(
                             color: theme.colorScheme.surface,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: theme.colorScheme.outline),
+                            border: Border.all(
+                              color: theme.colorScheme.outline,
+                            ),
                           ),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             leading: Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.surfaceContainerHighest,
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Icon(result.icon, color: theme.colorScheme.onSurfaceVariant),
+                              child: Icon(
+                                result.icon,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                             title: Text(
                               result.title,
@@ -99,20 +111,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               result.subtitle,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                            ),
-                            onTap: () => _openResult(context, ref, vault, result),
-                        trailing: result.secret == null
-                            ? null
-                            : IconButton(
-                                tooltip: 'Reveal secret',
-                                onPressed: () => _showSecret(
-                                  context,
-                                  ref,
-                                  result.secret!,
-                                ),
-                                icon: const Icon(Icons.visibility_outlined),
+                              style: TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
+                            ),
+                            onTap: () =>
+                                _openResult(context, ref, vault, result),
+                            trailing: result.secret == null
+                                ? null
+                                : IconButton(
+                                    tooltip: 'Reveal secret',
+                                    onPressed: () => _showSecret(
+                                      context,
+                                      ref,
+                                      result.secret!,
+                                    ),
+                                    icon: const Icon(Icons.visibility_outlined),
+                                  ),
                           ),
                         ),
                       );
@@ -135,14 +150,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   ) async {
     switch (result.type) {
       case 'Note':
-        final note = vault.notes.where((item) => item.id == result.id).firstOrNull;
+        final note = vault.notes
+            .where((item) => item.id == result.id)
+            .firstOrNull;
         if (note != null) {
           context.push('/notes/add', extra: note);
         }
         return;
       case 'Document':
-        final document =
-            vault.documents.where((item) => item.id == result.id).firstOrNull;
+        final document = vault.documents
+            .where((item) => item.id == result.id)
+            .firstOrNull;
         if (document != null) {
           DocumentsScreen.openDocument(context, document);
         }
@@ -153,8 +171,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         }
         return;
       case 'Event':
-        final event =
-            vault.events.where((item) => item.id == result.id).firstOrNull;
+        final event = vault.events
+            .where((item) => item.id == result.id)
+            .firstOrNull;
         if (event != null && context.mounted) {
           _showEvent(context, ref, event);
         }
@@ -162,7 +181,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
   }
 
-  Future<void> _showEvent(BuildContext context, WidgetRef ref, VaultEvent event) async {
+  Future<void> _showEvent(
+    BuildContext context,
+    WidgetRef ref,
+    VaultEvent event,
+  ) async {
     final result = await showDialog<VaultEvent>(
       context: context,
       builder: (context) => EventDialog(event: event),
@@ -178,9 +201,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   ) async {
     final settings = ref.read(settingsControllerProvider);
     if (settings.biometricEnabled) {
-      final authorized = await ref.read(biometricAuthProvider).authenticate(
-            reason: 'Authenticate to reveal this password',
-          );
+      final authorized = await ref
+          .read(biometricAuthProvider)
+          .authenticate(reason: 'Authenticate to reveal this password');
       if (!authorized || !context.mounted) return;
     }
     showDialog<void>(
@@ -189,7 +212,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         title: const Text('Protected secret'),
         content: SelectableText(secret),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
