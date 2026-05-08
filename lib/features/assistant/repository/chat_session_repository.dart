@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/data/database_helper.dart';
 import '../models/chat_session.dart';
+import 'assistant_tools.dart';
 
 final chatSessionRepositoryProvider = Provider<ChatSessionRepository>((ref) {
   return ChatSessionRepository(ref.read(databaseHelperProvider));
@@ -33,9 +34,21 @@ class ChatSessionRepository {
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         timestamp TEXT NOT NULL,
+        citations TEXT,
         FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
       )
     ''');
+    
+    // Add citations column if it doesn't exist (for existing DBs)
+    try {
+      final tableInfo = await db.rawQuery('PRAGMA table_info(chat_messages)');
+      final hasCitations = tableInfo.any((column) => column['name'] == 'citations');
+      if (!hasCitations) {
+        await db.execute('ALTER TABLE chat_messages ADD COLUMN citations TEXT;');
+      }
+    } catch (e) {
+      // Ignore if alter table fails, it might already exist or DB is locked
+    }
   }
 
   /// Get all sessions, ordered by most recent first.
@@ -120,6 +133,7 @@ class ChatSessionRepository {
     required String sessionId,
     required String role,
     required String content,
+    List<VaultCitation>? citations,
   }) async {
     final db = await _dbHelper.database;
     final entry = ChatMessageEntry(
@@ -128,6 +142,7 @@ class ChatSessionRepository {
       role: role,
       content: content,
       timestamp: DateTime.now(),
+      citations: citations,
     );
     await db.insert('chat_messages', entry.toMap());
     // Also update the session's updated_at timestamp
