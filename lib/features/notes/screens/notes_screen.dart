@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:second_brain_app/models/vault_model.dart';
 
-import '../../../models/vault_model.dart';
-import '../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../vault/controller/vault_controller.dart';
+import '../../../core/app_colors.dart';
+import 'widgets/note_card.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
   const NotesScreen({super.key});
@@ -27,23 +28,20 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   @override
   Widget build(BuildContext context) {
     final vaultAsync = ref.watch(vaultControllerProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = AppColors.of(context);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: isDark ? const Color(0xFF1E1A25) : const Color(0xFFF9F5FF),
+      backgroundColor: colors.bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF5A49D6)),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/');
-            }
-          },
+          icon: Icon(
+            Icons.arrow_back,
+            color: colors.isDark ? Colors.white : const Color(0xFF5A49D6),
+          ),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
         ),
         actions: [
           Padding(
@@ -52,7 +50,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               child: Text(
                 'Second Brain',
                 style: GoogleFonts.inter(
-                  color: isDark ? Colors.white : const Color(0xFF5A49D6),
+                  color: colors.isDark ? Colors.white : const Color(0xFF5A49D6),
                   fontWeight: FontWeight.w700,
                   fontSize: 18,
                 ),
@@ -66,7 +64,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: isDark
+            colors: colors.isDark
                 ? [const Color(0xFF1E1A25), const Color(0xFF120F16)]
                 : [const Color(0xFFF9F5FF), const Color(0xFFEBE0FA)],
           ),
@@ -97,7 +95,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                             style: GoogleFonts.inter(
                               fontSize: 48,
                               fontWeight: FontWeight.w400,
-                              color: isDark ? Colors.white : const Color(0xFF3F2A6E),
+                              color: colors.textColor,
                               letterSpacing: -1,
                             ),
                           ),
@@ -106,107 +104,19 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                             'Organizing ${vault.notes.length} thoughts and ideas',
                             style: TextStyle(
                               fontSize: 16,
-                              color: isDark ? Colors.white70 : const Color(0xFF5A5A5A),
+                              color: colors.subtextColor,
                             ),
                           ),
                           const SizedBox(height: 24),
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(32),
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF6366F1).withOpacity(0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ElevatedButton.icon(
-                              onPressed: () => context.push('/notes/add'),
-                              icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
-                              label: const Text(
-                                'New Note',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                padding: const EdgeInsets.symmetric(vertical: 18),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(32),
-                                ),
-                              ),
-                            ),
-                          ),
+                          _buildAddButton(context),
                           const SizedBox(height: 24),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF2C2533) : const Color(0xFFFAF7FF),
-                              borderRadius: BorderRadius.circular(32),
-                            ),
-                            child: TextField(
-                              controller: _searchController,
-                              onChanged: (val) => setState(() => _searchQuery = val),
-                              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                              decoration: InputDecoration(
-                                hintText: 'Search notes...',
-                                hintStyle: TextStyle(
-                                  color: isDark ? Colors.white54 : const Color(0xFF9E8DB3),
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-                                prefixIcon: Padding(
-                                  padding: const EdgeInsets.only(left: 8.0),
-                                  child: Icon(
-                                    Icons.search,
-                                    color: isDark ? Colors.white54 : const Color(0xFF9E8DB3),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                          _buildSearchField(colors),
                           const SizedBox(height: 32),
                         ],
                       ),
                     ),
                   ),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    sliver: filteredNotes.isEmpty
-                        ? SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 40.0),
-                              child: Center(
-                                child: Text(
-                                  'No notes found.',
-                                  style: TextStyle(
-                                    color: isDark ? Colors.white54 : const Color(0xFF6B5A8E),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          )
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final note = filteredNotes[index];
-                                return _buildNoteCard(context, ref, note, isDark);
-                              },
-                              childCount: filteredNotes.length,
-                            ),
-                          ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                  _buildNotesList(filteredNotes, colors),
                 ],
               ),
             );
@@ -216,82 +126,94 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     );
   }
 
-  Widget _buildNoteCard(BuildContext context, WidgetRef ref, VaultNote note, bool isDark) {
+  Widget _buildAddButton(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(24),
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2A2435).withOpacity(0.8) : Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.white,
-          width: 1.5,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
         ),
-        boxShadow: [
-          if (!isDark)
-            BoxShadow(
-              color: const Color(0xFFE2D8F0).withOpacity(0.5),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  note.title,
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white : const Color(0xFF2D2D2D),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: isDark ? Colors.white54 : const Color(0xFF8C8C8C), size: 20),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onSelected: (value) async {
-                  if (value == 'edit') {
-                    context.push('/notes/add', extra: note);
-                  } else if (value == 'delete') {
-                    final confirmed = await showDeleteConfirmation(
-                      context,
-                      itemType: 'Note',
-                      itemName: note.title,
-                    );
-                    if (confirmed && context.mounted) {
-                      ref.read(vaultControllerProvider.notifier).deleteNote(note.id);
-                    }
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
-              ),
-            ],
+      child: ElevatedButton.icon(
+        onPressed: () => context.push('/notes/add'),
+        icon: const Icon(
+          Icons.add_circle_outline,
+          color: Colors.white,
+          size: 20,
+        ),
+        label: const Text(
+          'New Note',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(height: 8),
-          Text(
-            note.content,
-            style: TextStyle(
-              fontSize: 15,
-              color: isDark ? Colors.white70 : const Color(0xFF8C8C8C),
-              height: 1.5,
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField(AppColors colors) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.isDark
+            ? const Color(0xFF2C2533)
+            : const Color(0xFFFAF7FF),
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        style: TextStyle(color: colors.textColor),
+        decoration: InputDecoration(
+          hintText: 'Search notes...',
+          hintStyle: TextStyle(color: colors.subtextColor),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 18,
+          ),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Icon(Icons.search, color: colors.subtextColor),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotesList(List<VaultNote> notes, AppColors colors) {
+    if (notes.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 40.0),
+          child: Center(
+            child: Text(
+              'No notes found.',
+              style: TextStyle(color: colors.subtextColor),
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
-        ],
+        ),
+      );
+    }
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => NoteCard(note: notes[index]),
+          childCount: notes.length,
+        ),
       ),
     );
   }
