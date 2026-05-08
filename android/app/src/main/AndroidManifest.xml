@@ -11,7 +11,7 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
-        android:label="second_brain_app"
+        android:label="SecondBrainAI"
         android:name="${applicationName}"
         android:enableOnBackInvokedCallback="true"
         android:largeHeap="true"
