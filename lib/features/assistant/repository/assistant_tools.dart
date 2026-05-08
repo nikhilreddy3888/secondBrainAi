@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:runanywhere/public/runanywhere_tool_calling.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
@@ -5,6 +6,53 @@ import 'package:uuid/uuid.dart';
 
 import '../../../models/vault_model.dart';
 import '../../vault/controller/vault_controller.dart';
+
+/// A citation entry representing a vault item used to answer a question.
+class VaultCitation {
+  const VaultCitation({
+    required this.id,
+    required this.type,
+    required this.title,
+    this.subtitle,
+  });
+
+  final String id;
+  /// One of: 'note', 'password', 'event', 'document'
+  final String type;
+  final String title;
+  final String? subtitle;
+
+  factory VaultCitation.fromJson(Map<String, dynamic> json) {
+    return VaultCitation(
+      id: json['id'] as String,
+      type: json['type'] as String,
+      title: json['title'] as String,
+      subtitle: json['subtitle'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type,
+        'title': title,
+        'subtitle': subtitle,
+      };
+
+  IconData get icon {
+    switch (type) {
+      case 'note':
+        return Icons.sticky_note_2_outlined;
+      case 'password':
+        return Icons.lock_outline;
+      case 'event':
+        return Icons.event_outlined;
+      case 'document':
+        return Icons.description_outlined;
+      default:
+        return Icons.info_outline;
+    }
+  }
+}
 
 class AssistantTools {
   AssistantTools._();
@@ -148,6 +196,87 @@ class AssistantTools {
     _registerTool(vaultQueryTools()[2], (args) => _listVaultItems(ref, args));
   }
 
+  static String _buildItemContext(Map<String, ToolValue> item) {
+    final type = item['type']?.stringValue ?? 'unknown';
+    final title = item['title']?.stringValue ?? '';
+    final buffer = StringBuffer('[$type] "$title": ');
+    
+    if (type == 'note') {
+      buffer.write(item['content']?.stringValue ?? '');
+    } else if (type == 'password') {
+      buffer.write('account=${item['accountName']?.stringValue ?? ''}, username=${item['username']?.stringValue ?? ''}, password=${item['password']?.stringValue ?? ''}');
+    } else if (type == 'event') {
+      buffer.write('time=${item['startsAt']?.stringValue ?? ''}, description=${item['description']?.stringValue ?? ''}');
+    } else if (type == 'document') {
+      buffer.write(item['content']?.stringValue ?? '');
+    } else {
+      buffer.write(item['content']?.stringValue ?? item['description']?.stringValue ?? item['username']?.stringValue ?? '');
+    }
+    return buffer.toString();
+  }
+
+  /// Deterministic vault search that bypasses LLM tool-calling.
+  /// Returns a context string for the LLM prompt and a list of citations.
+  static Future<({String context, List<VaultCitation> citations})>
+      searchAndBuildContext(Ref ref, String question) async {
+    final vault = await ref.read(vaultControllerProvider.future);
+    final searchResults = vault.search(question);
+
+    // If search returned nothing, fall back to listing everything
+    final useFullList = searchResults.isEmpty;
+    final items = useFullList ? _vaultItems(vault) : null;
+
+    final buffer = StringBuffer();
+    final citations = <VaultCitation>[];
+
+    if (!useFullList && searchResults.isNotEmpty) {
+      buffer.writeln('=== VAULT SEARCH RESULTS ===');
+      for (var i = 0; i < searchResults.length && i < 10; i++) {
+        final r = searchResults[i];
+        final fullItem = _findById(vault, r.id);
+        
+        if (fullItem != null) {
+          buffer.writeln(_buildItemContext(fullItem));
+        } else {
+          buffer.writeln('[${r.type}] "${r.title}": ${r.subtitle}');
+        }
+        
+        citations.add(VaultCitation(
+          id: r.id,
+          type: r.type.toLowerCase(),
+          title: r.title,
+          subtitle: r.subtitle,
+        ));
+      }
+      buffer.writeln('=== END RESULTS ===');
+    } else if (items != null && items.isNotEmpty) {
+      buffer.writeln('=== ALL VAULT ITEMS ===');
+      for (var i = 0; i < items.length && i < 15; i++) {
+        final item = items[i];
+        buffer.writeln(_buildItemContext(item));
+        
+        final type = item['type']?.stringValue ?? 'unknown';
+        final title = item['title']?.stringValue ?? '';
+        final content = item['content']?.stringValue ??
+            item['description']?.stringValue ??
+            item['username']?.stringValue ??
+            '';
+            
+        citations.add(VaultCitation(
+          id: item['id']?.stringValue ?? '',
+          type: type,
+          title: title,
+          subtitle: content.length > 80 ? '${content.substring(0, 80)}…' : content,
+        ));
+      }
+      buffer.writeln('=== END ITEMS ===');
+    } else {
+      buffer.writeln('The vault is empty. No items found.');
+    }
+
+    return (context: buffer.toString(), citations: citations);
+  }
+
   static void registerAgentTools(Ref ref) {
     _registerTool(agentTools()[0], (args) => _createNote(ref, args));
     _registerTool(agentTools()[1], (args) => _createPassword(ref, args));
@@ -173,7 +302,7 @@ class AssistantTools {
     final filtered = results.where((result) {
       if (requestedType == 'all' || requestedType.isEmpty) return true;
       return result.type.toLowerCase() == requestedType;
-    }).toList();
+    }).take(5).toList();
 
     return {
       'count': NumberToolValue(filtered.length.toDouble()),
