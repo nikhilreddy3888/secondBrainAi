@@ -61,11 +61,24 @@ class AiModelRegistry {
   }
 
   static const List<AiModelInfo> models = [
+    // ── Recommended / Default model ──
+    AiModelInfo(
+      id: 'llama-3.2-1b-instruct-q4',
+      displayName: 'Llama 3.2 1B',
+      family: 'Llama',
+      parameterCount: '1B',
+      description: 'Meta\'s compact model · Recommended for most devices',
+      downloadUrl:
+          'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
+      sizeLabel: '760 MB',
+      templateType: 'llama3',
+      contextSize: 4096,
+    ),
+
     // ═══════════════════════════════════════════════════════════
     // ── Qwen (Alibaba) ────────────────────────────────────────
     // ═══════════════════════════════════════════════════════════
 
-    // ── Default / Base model ──
     AiModelInfo(
       id: 'qwen3-0.6b-q4',
       displayName: 'Qwen 3 0.6B',
@@ -191,18 +204,6 @@ class AiModelRegistry {
     // ── Meta Llama ────────────────────────────────────────────
     // ═══════════════════════════════════════════════════════════
 
-    AiModelInfo(
-      id: 'llama-3.2-1b-instruct-q4',
-      displayName: 'Llama 3.2 1B',
-      family: 'Llama',
-      parameterCount: '1B',
-      description: 'Meta\'s compact model · Multilingual',
-      downloadUrl:
-          'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
-      sizeLabel: '760 MB',
-      templateType: 'llama3',
-      contextSize: 4096,
-    ),
 
     AiModelInfo(
       id: 'llama-3.2-3b-instruct-q4',
@@ -347,7 +348,7 @@ class AiModelRegistry {
   ];
 
   /// The default model to auto-select on first launch.
-  static AiModelInfo get defaultModel => models.firstWhere((m) => m.id == 'gemma-3-1b-it-q4');
+  static AiModelInfo get defaultModel => models.firstWhere((m) => m.id == 'llama-3.2-1b-instruct-q4');
 
   /// Look up a model by its ID, falling back to the default.
   static AiModelInfo findById(String id) {
