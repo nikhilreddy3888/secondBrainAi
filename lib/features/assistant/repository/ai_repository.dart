@@ -158,6 +158,12 @@ class AiRepository {
     return _modelFileCache?.keys.toSet() ?? <String>{};
   }
 
+  void invalidateModelCache() {
+    debugPrint('[AiRepository] Invalidating model file cache.');
+    _modelFileCache = null;
+    _discoverFuture = null;
+  }
+
   Future<String?> _getExistingModelFilePath([String? modelId]) async {
     await _discoverLocalModels();
     final id = modelId ?? _selectedModel.id;
@@ -399,6 +405,7 @@ class AiRepository {
     String question,
     List<ChatMessageEntry> history, {
     required AssistantMode mode,
+    String? vaultContext,
   }) {
     final buffer = StringBuffer();
     final template = _selectedModel.templateType;
@@ -415,8 +422,14 @@ class AiRepository {
       }
     }
 
+    // Prepare the user message content
+    String userContent = question;
+    if (mode == AssistantMode.vault && vaultContext != null && vaultContext.isNotEmpty) {
+      userContent = 'VAULT DATA:\n$vaultContext\n\nQuestion: $question';
+    }
+
     // Add current question as user message
-    _appendFormattedMessage(buffer, 'user', question, template);
+    _appendFormattedMessage(buffer, 'user', userContent, template);
 
     // Add the assistant start tag so the model knows to start generating its response
     _appendAssistantStartTag(buffer, template);
@@ -473,8 +486,10 @@ class AiRepository {
             : 'You are a private, helpful assistant. Answer directly.';
       case AssistantMode.vault:
         return isSmallModel
-            ? 'You are a vault assistant. To answer questions: 1. Use search_vault to find items. 2. If nothing found, use list_vault_items. 3. Answer using found data. Do NOT invent tools or data. Output ONLY tool calls or direct answers.'
-            : 'You are a vault assistant. Use tools to inspect the user\'s vault and answer only from the results.';
+            ? 'Answer the user\'s question using ONLY the provided vault data. If the answer is not in the data, say you could not find it. Be very brief.'
+            : 'You are a vault assistant. Answer the user\'s question ONLY using the vault data provided. '
+              'If the answer is not in the data, say you could not find it in the vault. '
+              'Be concise and accurate. Do NOT make up information.';
       case AssistantMode.agent:
         return isSmallModel
             ? 'You are a vault agent. Available tools: create_note, create_password, create_event, create_document. Use these to help the user. Output ONLY tool calls.'
@@ -496,7 +511,7 @@ class AiRepository {
   Stream<String> askStream(
     String question, {
     AssistantMode mode = AssistantMode.chat,
-    void Function(List<dynamic>)? onCitations,
+    void Function(List<VaultCitation>)? onCitations,
     List<ChatMessageEntry> history = const [],
     String? sessionId,
   }) async* {
@@ -531,6 +546,55 @@ class AiRepository {
           .split('.')
           .first;
       final metadata = 'Today is $currentDate, current time is $currentTime.';
+
+      // ── VAULT MODE: Deterministic RAG-style search ──
+      if (mode == AssistantMode.vault) {
+        debugPrint('[AI] Vault mode: running deterministic search...');
+        final vaultResult = await AssistantTools.searchAndBuildContext(
+          ref,
+          question,
+        );
+        debugPrint(
+          '[AI] Vault search returned ${vaultResult.citations.length} citations',
+        );
+
+        // Pass citations to the UI early, before generation
+        if (onCitations != null) {
+          onCitations(vaultResult.citations);
+        }
+
+        final systemPrompt =
+            '${_systemPromptForMode(mode)} $metadata';
+
+        final prompt = _historyToPrompt(
+          question,
+          _recentHistory(history, mode: mode),
+          mode: mode,
+          vaultContext: vaultResult.context,
+        );
+
+        debugPrint(
+          '[AI] Vault prompt length: ${prompt.length} chars, systemPrompt: ${systemPrompt.length} chars',
+        );
+
+        final streamResult = await RunAnywhere.generateStream(
+          prompt,
+          options: LLMGenerationOptions(
+            maxTokens: _isCurrentModelSmall ? 512 : 768,
+            temperature: 0.3,
+            systemPrompt: systemPrompt,
+            streamingEnabled: true,
+          ),
+        );
+
+        await for (final token in streamResult.stream) {
+          // Strip thinking blocks in real-time
+          yield token;
+        }
+
+        debugPrint('[AI] Vault stream completed');
+        return;
+      }
 
       final systemPrompt = '${_systemPromptForMode(mode)} $metadata';
 
