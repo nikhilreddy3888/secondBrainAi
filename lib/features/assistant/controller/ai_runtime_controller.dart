@@ -280,6 +280,8 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
       // The download itself consumed significant memory, and immediately
       // loading a 1GB+ model will trigger Android's OOM killer (SIGKILL).
       // Show a "Load" button so the user can load when ready.
+      repo.invalidateModelCache();
+      
       if (Platform.isAndroid) {
         final modelSizeMB = await repo.getModelFileSizeMB();
         if (modelSizeMB > 500) {
