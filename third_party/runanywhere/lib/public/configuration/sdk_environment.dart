@@ -116,7 +116,9 @@ class SupabaseConfig {
         final supabaseKey = DartBridgeDevConfig.supabaseKey;
         
         if (supabaseUrl == null || supabaseUrl.isEmpty ||
-            supabaseKey == null || supabaseKey.isEmpty) {
+            supabaseUrl.contains('YOUR_SUPABASE') ||
+            supabaseKey == null || supabaseKey.isEmpty ||
+            supabaseKey.contains('YOUR_SUPABASE')) {
           // Dev config not available - this is expected if development_config.cpp 
           // hasn't been filled in. Telemetry will be disabled in dev mode.
           return null;
