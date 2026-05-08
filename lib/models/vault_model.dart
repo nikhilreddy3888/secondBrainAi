@@ -54,24 +54,31 @@ class VaultData {
     final normalized = query.trim().toLowerCase();
     if (normalized.isEmpty) return [];
 
+    final stopWords = {'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'him', 'his', 'she', 'her', 'it', 'its', 'they', 'them', 'their', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now', 'many', 'much', 'show', 'find', 'get', 'tell', 'list'};
+
     final tokens = normalized
         .split(RegExp(r'\s+'))
         .map((token) => token.replaceAll(RegExp(r'[^a-z0-9]'), ''))
-        .where((token) => token.length >= 2)
+        .where((token) => token.length >= 2 && !stopWords.contains(token))
         .toSet();
 
     bool matches(String haystack) {
       final text = haystack.toLowerCase();
       if (text.contains(normalized)) return true;
+      if (tokens.isEmpty) return false;
       return tokens.any(text.contains);
     }
 
     int score(String haystack) {
       final text = haystack.toLowerCase();
-      var value = text.contains(normalized) ? 100 : 0;
+      var value = text.contains(normalized) ? 1000 : 0;
       for (final token in tokens) {
         if (text.contains(token)) {
-          value += token.length;
+          if (token.length > 4) {
+            value += token.length * token.length; // Stronger weight for longer/distinct words
+          } else {
+            value += token.length;
+          }
         }
       }
       return value;
