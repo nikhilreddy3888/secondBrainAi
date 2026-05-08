@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../repository/assistant_tools.dart';
 import '../models/chat_session.dart';
 import '../repository/chat_session_repository.dart';
 
@@ -114,7 +115,7 @@ class ChatSessionController extends Notifier<ChatSessionState> {
   }
 
   /// Save an assistant response to a specific session.
-  Future<void> addAssistantMessage(String content, {String? sessionId}) async {
+  Future<void> addAssistantMessage(String content, {String? sessionId, List<VaultCitation>? citations}) async {
     final targetId = sessionId ?? state.activeSessionId;
     if (targetId == null) return;
 
@@ -122,6 +123,7 @@ class ChatSessionController extends Notifier<ChatSessionState> {
       sessionId: targetId,
       role: 'assistant',
       content: content,
+      citations: citations,
     );
     // Reload active session fully
     await _reloadActiveSession();
