@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,10 +6,10 @@ import 'package:uuid/uuid.dart';
 
 import '../../../models/vault_model.dart';
 import '../../vault/controller/vault_controller.dart';
+import '../../../core/app_colors.dart';
 
 class AddNoteScreen extends ConsumerStatefulWidget {
   final VaultNote? note;
-
   const AddNoteScreen({super.key, this.note});
 
   @override
@@ -54,51 +53,14 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     await ref.read(vaultControllerProvider.notifier).upsertNote(note);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Note saved')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Note saved')));
       context.go('/notes');
     }
   }
 
-  void _insertText(String prefix, [String suffix = '']) {
-    final text = _contentController.text;
-    final selection = _contentController.selection;
-    
-    if (selection.start == -1) {
-      _contentController.text = text + prefix + suffix;
-      _contentController.selection = TextSelection.collapsed(offset: _contentController.text.length - suffix.length);
-      return;
-    }
-    
-    final selectedText = selection.textInside(text);
-    final newText = text.replaceRange(selection.start, selection.end, prefix + selectedText + suffix);
-    _contentController.text = newText;
-    _contentController.selection = TextSelection.collapsed(offset: selection.start + prefix.length + selectedText.length);
-  }
-
-  void _showDummyAction(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 1)),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final primaryPurple = isDark ? const Color(0xFF9B7BF0) : const Color(0xFF6B4BA3);
-    final bgGradientTop = isDark ? const Color(0xFF1E1A25) : const Color(0xFFFDF8FF);
-    final bgGradientBottom = isDark ? const Color(0xFF120E15) : const Color(0xFFF2E6F7);
-    final appBarBg = isDark ? const Color(0xFF2C2533).withOpacity(0.8) : const Color(0xFFFBF4FA).withOpacity(0.8);
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final hintColor = isDark ? Colors.white54 : Colors.black54;
-    final cardBg = isDark ? const Color(0xFF241E2B).withOpacity(0.8) : Colors.white.withOpacity(0.6);
-    final cardBorder = isDark ? Colors.white12 : Colors.white;
-    final chipBg = isDark ? Colors.white12 : Colors.white.withOpacity(0.7);
-    final menuBg = isDark ? const Color(0xFF2C2533) : Colors.white;
-    final toolbarBg = isDark ? const Color(0xFF2C2533) : Colors.white;
-    final iconColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final colors = AppColors.of(context);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -107,45 +69,43 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [bgGradientTop, bgGradientBottom],
+            colors: colors.isDark
+                ? [const Color(0xFF1E1A25), const Color(0xFF120E15)]
+                : [const Color(0xFFFDF8FF), const Color(0xFFF2E6F7)],
           ),
         ),
         child: SafeArea(
-          child: Stack(
+          child: Column(
             children: [
-              Column(
-                children: [
-                  _buildFloatingAppBar(primaryPurple, appBarBg, textColor),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 20),
-                          _buildTitleField(primaryPurple),
-                          const SizedBox(height: 12),
-                          _buildMetadataChips(primaryPurple, chipBg),
-                          const SizedBox(height: 24),
-                          Expanded(
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                _buildEditorCard(primaryPurple, cardBg, cardBorder, textColor, hintColor, menuBg),
-                                Positioned(
-                                  right: -15,
-                                  bottom: -15,
-                                  child: _buildElegantSaveButton(),
-                                ),
-                              ],
+              _buildAppBar(colors),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      _buildTitleField(colors),
+                      const SizedBox(height: 12),
+                      _buildMetadataChips(colors),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            _buildEditorCard(colors),
+                            Positioned(
+                              right: -15,
+                              bottom: -15,
+                              child: _buildSaveButton(),
                             ),
-                          ),
-                          const SizedBox(height: 20), // padding for bottom toolbars
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 40),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -154,12 +114,12 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildFloatingAppBar(Color primaryPurple, Color appBarBg, Color textColor) {
+  Widget _buildAppBar(AppColors colors) {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: appBarBg,
+        color: colors.surfaceColor.withOpacity(0.8),
         borderRadius: BorderRadius.circular(40),
         boxShadow: [
           BoxShadow(
@@ -173,22 +133,12 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back, color: primaryPurple),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/notes');
-              }
-            },
+            icon: Icon(Icons.arrow_back, color: colors.textColor),
+            onPressed: () => context.canPop() ? context.pop() : context.go('/notes'),
           ),
           Text(
-            'AI Notes',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
+            'Edit Note',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colors.textColor),
           ),
           const SizedBox(width: 48),
         ],
@@ -196,23 +146,14 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildTitleField(Color primaryPurple) {
+  Widget _buildTitleField(AppColors colors) {
     return TextField(
       controller: _titleController,
-      style: TextStyle(
-        fontSize: 32,
-        fontWeight: FontWeight.w800,
-        color: primaryPurple,
-        height: 1.2,
-      ),
+      style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: colors.textColor, height: 1.2),
       maxLines: null,
       decoration: InputDecoration(
         hintText: 'Note Title',
-        hintStyle: TextStyle(
-          fontSize: 32,
-          fontWeight: FontWeight.w800,
-          color: primaryPurple.withOpacity(0.5),
-        ),
+        hintStyle: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: colors.subtextColor.withOpacity(0.5)),
         border: InputBorder.none,
         isDense: true,
         contentPadding: EdgeInsets.zero,
@@ -220,93 +161,52 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildMetadataChips(Color primaryPurple, Color chipBg) {
+  Widget _buildMetadataChips(AppColors colors) {
     final now = widget.note?.updatedAt ?? DateTime.now();
-    final timeString = 'Today, ${DateFormat('h:mm a').format(now)}';
+    final timeString = 'Last updated: ${DateFormat('h:mm a').format(now)}';
 
-    return Row(
-      children: [
-        _buildChip(timeString, primaryPurple, chipBg),
-      ],
-    );
-  }
-
-  Widget _buildChip(String text, Color color, Color bg, {IconData? icon}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: bg,
+        color: colors.surfaceColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: colors.borderColor),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
+      child: Text(
+        timeString,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.subtextColor),
       ),
     );
   }
 
-  Widget _buildEditorCard(Color primaryPurple, Color cardBg, Color cardBorder, Color textColor, Color hintColor, Color menuBg) {
+  Widget _buildEditorCard(AppColors colors) {
     return Container(
       width: double.infinity,
       height: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: cardBg,
+        color: colors.surfaceColor.withOpacity(0.7),
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: cardBorder, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: primaryPurple.withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        border: Border.all(color: colors.borderColor, width: 2),
       ),
-      child: Stack(
-        children: [
-          TextField(
-            controller: _contentController,
-            style: TextStyle(
-              fontSize: 16,
-              color: textColor,
-              height: 1.6,
-            ),
-            maxLines: null,
-            expands: true,
-            textAlignVertical: TextAlignVertical.top,
-            decoration: InputDecoration(
-              hintText: 'Start typing your thoughts...',
-              hintStyle: TextStyle(
-                fontSize: 16,
-                color: hintColor,
-              ),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ],
+      child: TextField(
+        controller: _contentController,
+        style: TextStyle(fontSize: 16, color: colors.textColor, height: 1.6),
+        maxLines: null,
+        expands: true,
+        textAlignVertical: TextAlignVertical.top,
+        decoration: InputDecoration(
+          hintText: 'Start typing...',
+          hintStyle: TextStyle(fontSize: 16, color: colors.subtextColor),
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+        ),
       ),
     );
   }
 
-
-
-  Widget _buildElegantSaveButton() {
+  Widget _buildSaveButton() {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
