@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
+
+import '../repository/assistant_tools.dart';
 
 /// Represents a single chat session with metadata.
 class ChatSession {
@@ -96,6 +99,7 @@ class ChatMessageEntry {
     required this.role,
     required this.content,
     required this.timestamp,
+    this.citations,
   });
 
   final String id;
@@ -103,22 +107,41 @@ class ChatMessageEntry {
   final String role; // 'user', 'assistant', 'system'
   final String content;
   final DateTime timestamp;
+  final List<VaultCitation>? citations;
 
-  Map<String, dynamic> toMap() => {
-    'id': id,
-    'session_id': sessionId,
-    'role': role,
-    'content': content,
-    'timestamp': timestamp.toIso8601String(),
-  };
+  Map<String, dynamic> toMap() {
+    final map = <String, dynamic>{
+      'id': id,
+      'session_id': sessionId,
+      'role': role,
+      'content': content,
+      'timestamp': timestamp.toIso8601String(),
+    };
+    if (citations != null && citations!.isNotEmpty) {
+      map['citations'] = jsonEncode(citations!.map((c) => c.toJson()).toList());
+    }
+    return map;
+  }
 
   factory ChatMessageEntry.fromMap(Map<String, dynamic> map) {
+    List<VaultCitation>? citationsList;
+    if (map['citations'] != null) {
+      try {
+        final decoded = jsonDecode(map['citations'] as String) as List;
+        citationsList = decoded.map((c) => VaultCitation.fromJson(c as Map<String, dynamic>)).toList();
+      } catch (e) {
+        // Fallback for corrupted data
+        citationsList = null;
+      }
+    }
+
     return ChatMessageEntry(
       id: map['id'] as String,
       sessionId: map['session_id'] as String,
       role: map['role'] as String,
       content: map['content'] as String,
       timestamp: DateTime.parse(map['timestamp'] as String),
+      citations: citationsList,
     );
   }
 }
