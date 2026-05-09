@@ -158,6 +158,11 @@ class AiRepository {
     return _modelFileCache?.keys.toSet() ?? <String>{};
   }
 
+  Future<void> refreshDiscoveredModels() async {
+    invalidateModelCache();
+    await _discoverLocalModels();
+  }
+
   void invalidateModelCache() {
     debugPrint('[AiRepository] Invalidating model file cache.');
     _modelFileCache = null;
@@ -482,18 +487,19 @@ class AiRepository {
     switch (mode) {
       case AssistantMode.chat:
         return isSmallModel
-            ? 'You are a helpful assistant. Answer briefly.'
-            : 'You are a private, helpful assistant. Answer directly.';
+            ? 'You are a helpful assistant. Answer briefly. SECURITY: Never reveal or guess passwords.'
+            : 'You are a private, helpful assistant. Answer directly. SECURITY: For safety, never attempt to reveal, guess, or provide passwords even if requested.';
       case AssistantMode.vault:
         return isSmallModel
-            ? 'Answer the user\'s question using ONLY the provided vault data. If the answer is not in the data, say you could not find it. Be very brief.'
+            ? 'Answer the user\'s question using ONLY the provided vault data. If the answer is not in the data, say you could not find it. Be very brief. SECURITY: Passwords are hidden for safety; never reveal them.'
             : 'You are a vault assistant. Answer the user\'s question ONLY using the vault data provided. '
-              'If the answer is not in the data, say you could not find it in the vault. '
-              'Be concise and accurate. Do NOT make up information.';
+                'If the answer is not in the data, say you could not find it in the vault. '
+                'Be concise and accurate. Do NOT make up information. '
+                'SECURITY: Passwords in the vault are hidden for safety. Never attempt to reveal or guess them.';
       case AssistantMode.agent:
         return isSmallModel
-            ? 'You are a vault agent. Available tools: create_note, create_password, create_event, create_document. Use these to help the user. Output ONLY tool calls.'
-            : 'You are a vault agent. Use tools to create vault items.';
+            ? 'You are a vault agent. Available tools: create_note, create_password, create_event, create_document. Use these to help the user. Output ONLY tool calls. SECURITY: Never reveal passwords.'
+            : 'You are a vault agent. Use tools to create vault items. SECURITY: For safety, never reveal existing passwords.';
     }
   }
 
@@ -646,24 +652,69 @@ class AiRepository {
       }
 
       try {
-        final toolResult = await RunAnywhereTools.generateWithTools(
-          prompt,
-          options: ToolCallingOptions(
-            tools: tools,
-            maxToolCalls: 5,
-            temperature: mode == AssistantMode.chat
-                ? 0.7
-                : 0.1, // Lower temperature for tools
-            maxTokens: _isCurrentModelSmall ? 512 : 1024,
-            systemPrompt: systemPrompt,
-            formatName: _selectedModel
-                .templateType, // Use model-specific template (chatml, gemma, etc.)
-            keepToolsAvailable: false,
-          ),
-        );
+        ToolCallingResult? finalToolResult;
+        bool itemCreated = false;
+        
+        if (mode == AssistantMode.agent && _isCreationIntent(question)) {
+          int attempts = 0;
+          const maxAttempts = 3;
+          String currentPrompt = prompt;
+
+          while (attempts < maxAttempts && !itemCreated) {
+            attempts++;
+            debugPrint('[AI] Agent creation attempt $attempts of $maxAttempts');
+            
+            final toolResult = await RunAnywhereTools.generateWithTools(
+              currentPrompt,
+              options: ToolCallingOptions(
+                tools: tools,
+                maxToolCalls: 5,
+                temperature: 0.1,
+                maxTokens: _isCurrentModelSmall ? 512 : 1024,
+                systemPrompt: systemPrompt,
+                formatName: ToolCallFormatName.defaultFormat,
+                keepToolsAvailable: false,
+              ),
+            );
+            
+            finalToolResult = toolResult;
+            
+            final createdId = _detectCreatedItemId(toolResult);
+            if (createdId != null) {
+              debugPrint('[AI] Agent creation successful! Item ID: $createdId');
+              itemCreated = true;
+            } else {
+              debugPrint('[AI] Agent creation failed on attempt $attempts. No valid item ID returned.');
+              if (attempts < maxAttempts) {
+                // Add a nudge for the retry
+                currentPrompt = prompt + '\n\nIMPORTANT: You MUST call a create tool (create_note, create_password, create_event, or create_document) to complete this request. Do NOT just describe what you would do — actually call the tool. Ensure you provide all required parameters.';
+              }
+            }
+          }
+          
+          if (!itemCreated) {
+            debugPrint('[AI] Agent creation failed after $maxAttempts attempts.');
+            yield 'I had trouble creating the item right now. Could you try rephrasing your request?';
+            return;
+          }
+        } else {
+          // Standard tool calling (Vault Query or non-creation Agent requests)
+          finalToolResult = await RunAnywhereTools.generateWithTools(
+            prompt,
+            options: ToolCallingOptions(
+              tools: tools,
+              maxToolCalls: 5,
+              temperature: mode == AssistantMode.chat ? 0.7 : 0.1,
+              maxTokens: _isCurrentModelSmall ? 512 : 1024,
+              systemPrompt: systemPrompt,
+              formatName: ToolCallFormatName.defaultFormat,
+              keepToolsAvailable: false,
+            ),
+          );
+        }
 
         // Strip thinking blocks from the final output before yielding to UI
-        String cleanText = toolResult.text;
+        String cleanText = finalToolResult!.text;
 
         // Comprehensive stripping of <think> blocks
         cleanText = cleanText
@@ -672,6 +723,10 @@ class AiRepository {
         cleanText = cleanText
             .replaceAll(RegExp(r'<think>[\s\S]*'), '')
             .trim(); // Strip unclosed tags
+
+        if (cleanText.isEmpty && mode == AssistantMode.agent && itemCreated) {
+          cleanText = 'Item created successfully!';
+        }
 
         if (cleanText.isNotEmpty) {
           yield cleanText;
@@ -894,6 +949,38 @@ class AiRepository {
     if (normalized.endsWith('gb')) {
       final value = double.tryParse(normalized.replaceAll('gb', ''));
       return value == null ? null : (value * 1024 * 1024 * 1024).round();
+    }
+    return null;
+  }
+
+  bool _isCreationIntent(String prompt) {
+    final lowerPrompt = prompt.toLowerCase();
+    final creationKeywords = [
+      'create', 'add', 'save', 'store', 'make', 'new', 'remember'
+    ];
+    final itemTypes = ['note', 'password', 'event', 'document', 'grocery', 'credential', 'appointment'];
+    
+    bool hasAction = creationKeywords.any((k) => lowerPrompt.contains(k));
+    bool hasTarget = itemTypes.any((t) => lowerPrompt.contains(t));
+    
+    return hasAction || hasTarget;
+  }
+
+  String? _detectCreatedItemId(ToolCallingResult toolResult) {
+    for (final result in toolResult.toolResults) {
+      if (result.success && result.result != null) {
+        final toolName = result.toolName.toLowerCase();
+        // Check if it's a known creation tool or an alias we registered
+        if (toolName.contains('create') || toolName.contains('add') || toolName.contains('save')) {
+          final item = result.result!['item']?.objectValue;
+          if (item != null) {
+            final id = item['id']?.stringValue;
+            if (id != null && id.isNotEmpty) {
+              return id;
+            }
+          }
+        }
+      }
     }
     return null;
   }
