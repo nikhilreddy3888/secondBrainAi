@@ -65,7 +65,14 @@ class AiRuntimeState {
 }
 
 class AiRuntimeController extends Notifier<AiRuntimeState> {
-  static const _storage = FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock,
+    ),
+  );
   static const _selectedModelKey = 'assistant_selected_model_id';
 
   @override
@@ -178,9 +185,8 @@ class AiRuntimeController extends Notifier<AiRuntimeState> {
 
   Future<void> refreshDownloadedModels() async {
     final repo = ref.read(aiRepositoryProvider);
-    // Do a single discovery pass, then check all models against the cache
-    // This avoids 18+ separate file I/O operations
-    await repo.initialize();
+    // Force a re-discovery of models (handles cache invalidation)
+    await repo.refreshDiscoveredModels();
     
     // Ensure models are registered (uses cache and serialization)
     await repo.ensureModelsRegistered();

@@ -27,30 +27,15 @@ class DatabaseHelper {
 
     final password = await _keyManager.getOrCreateMasterKey();
 
-    try {
-      _database = await openDatabase(
-        path,
-        version: 2,
-        password: password,
-        onCreate: _onCreate,
-        onUpgrade: _onUpgrade,
-        singleInstance: true,
-      );
-      return _database!;
-    } catch (e) {
-      if (await databaseExists(path)) {
-        await deleteDatabase(path);
-      }
-      _database = await openDatabase(
-        path,
-        version: 2,
-        password: password,
-        onCreate: _onCreate,
-        onUpgrade: _onUpgrade,
-        singleInstance: true,
-      );
-      return _database!;
-    }
+    _database = await openDatabase(
+      path,
+      version: 2,
+      password: password,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+      singleInstance: true,
+    );
+    return _database!;
   }
 
   Future<void> _onCreate(Database db, int version) async {

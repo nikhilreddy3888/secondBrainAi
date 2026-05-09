@@ -9,7 +9,14 @@ final keyManagerProvider = Provider<KeyManager>((ref) {
 });
 
 class KeyManager {
-  static const _storage = FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock,
+    ),
+  );
   static const _masterKeyAlias = 'second_brain_master_key_v1';
 
   /// Retrieves the existing master key or generates a new one.
