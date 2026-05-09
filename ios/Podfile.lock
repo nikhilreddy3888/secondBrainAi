@@ -2,9 +2,6 @@ PODS:
   - audioplayers_darwin (0.0.1):
     - Flutter
     - FlutterMacOS
-  - CwlCatchException (2.2.1):
-    - CwlCatchExceptionSupport (~> 2.2.1)
-  - CwlCatchExceptionSupport (2.2.1)
   - device_info_plus (0.0.1):
     - Flutter
   - DKImagePickerController/Core (4.3.9):
@@ -54,22 +51,15 @@ PODS:
   - FMDB/SQLCipher (2.7.12):
     - FMDB/Core
     - SQLCipher (~> 4.6)
-  - image_picker_ios (0.0.1):
-    - Flutter
   - local_auth_darwin (0.0.1):
     - Flutter
     - FlutterMacOS
-  - onnxruntime (0.0.1):
-    - Flutter
-    - onnxruntime-objc (>= 1.18.0)
   - onnxruntime-c (1.18.0)
   - onnxruntime-objc (1.18.0):
     - onnxruntime-objc/Core (= 1.18.0)
   - onnxruntime-objc/Core (1.18.0):
     - onnxruntime-c (= 1.18.0)
   - permission_handler_apple (9.3.0):
-    - Flutter
-  - rag_engine_flutter (0.0.1):
     - Flutter
   - record_ios (1.2.0):
     - Flutter
@@ -82,10 +72,6 @@ PODS:
     - SDWebImage/Core (= 5.21.7)
   - SDWebImage/Core (5.21.7)
   - shared_preferences_foundation (0.0.1):
-    - Flutter
-    - FlutterMacOS
-  - speech_to_text (7.2.0):
-    - CwlCatchException
     - Flutter
     - FlutterMacOS
   - sqflite_darwin (0.0.4):
@@ -111,25 +97,19 @@ DEPENDENCIES:
   - flutter_pdfview (from `.symlinks/plugins/flutter_pdfview/ios`)
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
   - flutter_tts (from `.symlinks/plugins/flutter_tts/ios`)
-  - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - local_auth_darwin (from `.symlinks/plugins/local_auth_darwin/darwin`)
-  - onnxruntime (from `.symlinks/plugins/onnxruntime/ios`)
   - onnxruntime-c (= 1.18.0)
   - onnxruntime-objc (= 1.18.0)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
-  - rag_engine_flutter (from `.symlinks/plugins/rag_engine_flutter/ios`)
   - record_ios (from `.symlinks/plugins/record_ios/ios`)
   - runanywhere (from `.symlinks/plugins/runanywhere/ios`)
   - runanywhere_llamacpp (from `.symlinks/plugins/runanywhere_llamacpp/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
-  - speech_to_text (from `.symlinks/plugins/speech_to_text/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
   - sqflite_sqlcipher (from `.symlinks/plugins/sqflite_sqlcipher/ios`)
 
 SPEC REPOS:
   trunk:
-    - CwlCatchException
-    - CwlCatchExceptionSupport
     - DKImagePickerController
     - DKPhotoGallery
     - FMDB
@@ -156,16 +136,10 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_secure_storage/ios"
   flutter_tts:
     :path: ".symlinks/plugins/flutter_tts/ios"
-  image_picker_ios:
-    :path: ".symlinks/plugins/image_picker_ios/ios"
   local_auth_darwin:
     :path: ".symlinks/plugins/local_auth_darwin/darwin"
-  onnxruntime:
-    :path: ".symlinks/plugins/onnxruntime/ios"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
-  rag_engine_flutter:
-    :path: ".symlinks/plugins/rag_engine_flutter/ios"
   record_ios:
     :path: ".symlinks/plugins/record_ios/ios"
   runanywhere:
@@ -174,8 +148,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/runanywhere_llamacpp/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
-  speech_to_text:
-    :path: ".symlinks/plugins/speech_to_text/darwin"
   sqflite_darwin:
     :path: ".symlinks/plugins/sqflite_darwin/darwin"
   sqflite_sqlcipher:
@@ -183,8 +155,6 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   audioplayers_darwin: 835ced6edd4c9fc8ebb0a7cc9e294a91d99917d5
-  CwlCatchException: 7acc161b299a6de7f0a46a6ed741eae2c8b4d75a
-  CwlCatchExceptionSupport: 54ccab8d8c78907b57f99717fb19d4cc3bce02dc
   device_info_plus: 71ffc6ab7634ade6267c7a93088ed7e4f74e5896
   DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
@@ -195,19 +165,15 @@ SPEC CHECKSUMS:
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
   flutter_tts: 35ac3c7d42412733e795ea96ad2d7e05d0a75113
   FMDB: 728731dd336af3936ce00f91d9d8495f5718a0e6
-  image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   local_auth_darwin: c3ee6cce0a8d56be34c8ccb66ba31f7f180aaebb
-  onnxruntime: e4e82e1560ba6002ac85e2fe3f4d9efd4931c088
   onnxruntime-c: a909204639a1f035f575127ac406f781ac797c9c
   onnxruntime-objc: b6fab0f1787aa6f7190c2013f03037df4718bd8b
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
-  rag_engine_flutter: 340c0090dfc537ae364b63b6a9c3cbf02e7b7519
   record_ios: 412daca2350b228e698fffcd08f1f94ceb1e3844
   runanywhere: 332a947c58d9fb685fce886a832387309fac73a5
   runanywhere_llamacpp: 702472caaeef05c314dcee601d1ffda336a85ce2
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
-  speech_to_text: 3b313d98516d3d0406cea424782ec25470c59d19
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   sqflite_sqlcipher: 8e5bdaae6b2c254f8a277a564f07bc4e2a8642a3
   SQLCipher: eb79c64049cb002b4e9fcb30edb7979bf4706dfc
