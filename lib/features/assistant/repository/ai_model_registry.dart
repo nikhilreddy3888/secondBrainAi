@@ -1,3 +1,5 @@
+import 'dart:io';
+
 /// Registry of available AI models that the user can download and run on-device.
 ///
 /// Each [AiModelInfo] entry describes a single quantized GGUF model hosted on
@@ -63,15 +65,15 @@ class AiModelRegistry {
   static const List<AiModelInfo> models = [
     // ── Recommended / Default model ──
     AiModelInfo(
-      id: 'llama-3.2-1b-instruct-q4',
-      displayName: 'Llama 3.2 1B',
-      family: 'Llama',
+      id: 'gemma-3-1b-it-q4',
+      displayName: 'Gemma 3 1B',
+      family: 'Gemma',
       parameterCount: '1B',
-      description: 'Meta\'s compact model · Recommended for most devices',
+      description: 'Google\'s latest tiny model · Fast & capable',
       downloadUrl:
-          'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
-      sizeLabel: '760 MB',
-      templateType: 'llama3',
+          'https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf',
+      sizeLabel: '750 MB',
+      templateType: 'gemma',
       contextSize: 4096,
     ),
 
@@ -162,15 +164,15 @@ class AiModelRegistry {
     // ═══════════════════════════════════════════════════════════
 
     AiModelInfo(
-      id: 'gemma-3-1b-it-q4',
-      displayName: 'Gemma 3 1B',
-      family: 'Gemma',
+      id: 'llama-3.2-1b-instruct-q3',
+      displayName: 'Llama 3.2 1B (Fast)',
+      family: 'Llama',
       parameterCount: '1B',
-      description: 'Google\'s latest tiny model · Fast & capable',
+      description: 'Heavily quantized for speed · Best for older phones',
       downloadUrl:
-          'https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf',
-      sizeLabel: '750 MB',
-      templateType: 'gemma',
+          'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q3_K_M.gguf',
+      sizeLabel: '691 MB',
+      templateType: 'llama3',
       contextSize: 4096,
     ),
 
@@ -204,7 +206,18 @@ class AiModelRegistry {
     // ── Meta Llama ────────────────────────────────────────────
     // ═══════════════════════════════════════════════════════════
 
-
+    AiModelInfo(
+      id: 'llama-3.2-1b-instruct-q4',
+      displayName: 'Llama 3.2 1B',
+      family: 'Llama',
+      parameterCount: '1B',
+      description: 'Meta\'s compact model · Better quality, slightly slower',
+      downloadUrl:
+          'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
+      sizeLabel: '760 MB',
+      templateType: 'llama3',
+      contextSize: 4096,
+    ),
     AiModelInfo(
       id: 'llama-3.2-3b-instruct-q4',
       displayName: 'Llama 3.2 3B',
@@ -348,7 +361,12 @@ class AiModelRegistry {
   ];
 
   /// The default model to auto-select on first launch.
-  static AiModelInfo get defaultModel => models.firstWhere((m) => m.id == 'llama-3.2-1b-instruct-q4');
+  static AiModelInfo get defaultModel {
+    if (Platform.isIOS) {
+      return models.firstWhere((m) => m.id == 'gemma-3-1b-it-q4');
+    }
+    return models.firstWhere((m) => m.id == 'smollm2-360m-instruct-q8');
+  }
 
   /// Look up a model by its ID, falling back to the default.
   static AiModelInfo findById(String id) {
