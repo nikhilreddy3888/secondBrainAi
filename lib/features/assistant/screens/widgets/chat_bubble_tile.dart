@@ -40,7 +40,7 @@ class ChatBubbleTile extends StatelessWidget {
               border: isUser ? null : Border.all(color: colors.borderColor),
             ),
             child: Text(
-              message.content.isEmpty && isStreaming ? 'Generating...' : message.content,
+              message.content.isEmpty && isStreaming ? 'Thinking...' : message.content,
               style: GoogleFonts.inter(color: isUser ? Colors.white : colors.textColor, fontSize: 15, height: 1.4),
             ),
           ),

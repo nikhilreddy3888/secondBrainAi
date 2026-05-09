@@ -158,8 +158,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
     } catch (e) {
       yield 'Error: $e';
     } finally {
+      final finalResponse = responseBuffer.isEmpty ? 'I could not generate a response.' : responseBuffer.toString();
       await chatController.addAssistantMessage(
-        responseBuffer.toString(),
+        finalResponse,
         sessionId: sessionId,
         citations: collectedCitations,
       );

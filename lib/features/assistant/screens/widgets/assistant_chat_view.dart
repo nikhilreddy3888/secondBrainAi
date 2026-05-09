@@ -80,6 +80,7 @@ class _AssistantChatViewState extends State<AssistantChatView> {
 
     setState(() {
       _messages.add(ChatBubble(role: 'user', content: msg));
+      _messages.add(const ChatBubble(role: 'assistant-stream', content: ''));
       _inputController.clear();
       _isSending = true;
     });
