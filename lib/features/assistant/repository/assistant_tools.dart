@@ -200,17 +200,31 @@ class AssistantTools {
     final type = item['type']?.stringValue ?? 'unknown';
     final title = item['title']?.stringValue ?? '';
     final buffer = StringBuffer('[$type] "$title": ');
-    
+
     if (type == 'note') {
       buffer.write(item['content']?.stringValue ?? '');
     } else if (type == 'password') {
-      buffer.write('account=${item['accountName']?.stringValue ?? ''}, username=${item['username']?.stringValue ?? ''}, password=${item['password']?.stringValue ?? ''}');
+      // SECURITY: Mask the password so the LLM doesn't see it in plaintext.
+      // This prevents the AI from leaking the actual password in its response.
+      buffer.write(
+        'account=${item['accountName']?.stringValue ?? ''}, '
+        'username=${item['username']?.stringValue ?? ''}, '
+        'password=[HIDDEN/ENCRYPTED]',
+      );
     } else if (type == 'event') {
-      buffer.write('time=${item['startsAt']?.stringValue ?? ''}, description=${item['description']?.stringValue ?? ''}');
+      buffer.write(
+        'time=${item['startsAt']?.stringValue ?? ''}, '
+        'description=${item['description']?.stringValue ?? ''}',
+      );
     } else if (type == 'document') {
       buffer.write(item['content']?.stringValue ?? '');
     } else {
-      buffer.write(item['content']?.stringValue ?? item['description']?.stringValue ?? item['username']?.stringValue ?? '');
+      buffer.write(
+        item['content']?.stringValue ??
+            item['description']?.stringValue ??
+            item['username']?.stringValue ??
+            '',
+      );
     }
     return buffer.toString();
   }
@@ -491,7 +505,7 @@ class AssistantTools {
     'title': StringToolValue(password.accountName),
     'accountName': StringToolValue(password.accountName),
     'username': StringToolValue(password.username),
-    'password': StringToolValue(password.password),
+    'password': const StringToolValue('[HIDDEN/ENCRYPTED]'),
     'referenceTag': StringToolValue(
       _referenceTag('password', password.id, password.accountName),
     ),
